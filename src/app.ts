@@ -5,7 +5,24 @@ import closeWithGrace from "close-with-grace";
 
 // Instantiate Fastify with some config
 const app = fastify({
-  logger: true,
+  logger: {
+    transport:
+      process.env.NODE_ENV !== "production"
+        ? {
+            target: "pino-pretty",
+            options: {
+              translateTime: "HH:MM:ss Z",
+              ignore: "pid,hostname",
+            },
+          }
+        : undefined,
+    level:
+      process.env.DEBUG != null
+        ? "debug"
+        : process.env.NODE_ENV === "test"
+        ? "error"
+        : "info",
+  },
 }).withTypeProvider<TypeBoxTypeProvider>();
 
 // Declare a route
