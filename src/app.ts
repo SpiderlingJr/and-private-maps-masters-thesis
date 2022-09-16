@@ -2,6 +2,12 @@ import { fastify } from "fastify";
 import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
 import closeWithGrace from "close-with-grace";
+import { pipeline } from "stream";
+import { promisify } from "util";
+import { createWriteStream } from "fs";
+import fastifyMultipart from "@fastify/multipart";
+
+const pump = promisify(pipeline);
 
 // Instantiate Fastify with some config
 const app = fastify({
@@ -24,6 +30,23 @@ const app = fastify({
         : "info",
   },
 }).withTypeProvider<TypeBoxTypeProvider>();
+
+app.register(fastifyMultipart.default, {
+  limits: { files: 1 },
+});
+
+app.post("/mp", async function (req, reply) {
+  const data = await req.file();
+
+  // TODO validate geojson body
+
+  // TODO parse to postgis-format
+
+  // TODO change destination point
+  await pump(data.file, createWriteStream(`storage/received/${data.filename}`));
+
+  reply.send();
+});
 
 // Declare a route
 app.get(

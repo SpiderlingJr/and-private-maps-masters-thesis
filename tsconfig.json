@@ -4,6 +4,7 @@
     "module": "NodeNext",
     "esModuleInterop": false,
     "forceConsistentCasingInFileNames": true,
-    "strict": true
+    "strict": true,
+    "noEmitOnError": true
   }
 }

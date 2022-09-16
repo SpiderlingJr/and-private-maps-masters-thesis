@@ -1,3 +1,6 @@
 .nyc_output
 node_modules
 coverage
+storage
+inputs
+package-lock.json

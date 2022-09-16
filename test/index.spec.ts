@@ -8,6 +8,7 @@ test('requests the "/" route', async (t) => {
     headers: {
       "content-type": "application/json",
     },
+    //query: { foo: "1", bar: "baaa" },
   });
   t.equal(response.statusCode, 400, "returns a status code of 400");
   t.same(JSON.parse(response.body), {

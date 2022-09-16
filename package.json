@@ -36,11 +36,15 @@
   },
   "dependencies": {
     "@esbuild-kit/esm-loader": "^2.4.2",
+    "@fastify/formbody": "^7.2.0",
+    "@fastify/multipart": "^7.1.2",
     "@fastify/type-provider-typebox": "^2.3.0",
     "@sinclair/typebox": "^0.24.41",
     "close-with-grace": "^1.1.0",
     "fastify": "^4.5.3",
-    "fastify-multipart": "^5.4.0"
+    "fastify-multipart": "^5.4.0",
+    "fastify-plugin": "^4.2.1",
+    "util.promisify": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "^18.7.17",
@@ -52,6 +56,7 @@
     "eslint-config-prettier": "^8.5.0",
     "husky": "^8.0.1",
     "lint-staged": "^13.0.3",
+    "nodemon": "^2.0.19",
     "pino-pretty": "^9.1.0",
     "prettier": "^2.7.1",
     "tap": "^16.3.0",
