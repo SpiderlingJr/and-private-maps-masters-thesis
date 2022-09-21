@@ -6,8 +6,13 @@ import { pipeline } from "stream";
 import { promisify } from "util";
 import { createWriteStream } from "fs";
 import fastifyMultipart from "@fastify/multipart";
+import { MultipartFile } from "@fastify/multipart";
+import { FastifyRequest } from "fastify";
+import { GeoJSONFeatureValidator } from "./ndvalidate.js";
 
 const pump = promisify(pipeline);
+
+const featureValidator = new GeoJSONFeatureValidator();
 
 // Instantiate Fastify with some config
 const app = fastify({
@@ -32,18 +37,32 @@ const app = fastify({
 }).withTypeProvider<TypeBoxTypeProvider>();
 
 app.register(fastifyMultipart.default, {
-  limits: { files: 1 },
+  limits: {
+    files: 1, // cannot handle more than 1 file atm
+  },
 });
 
-app.post("/mp", async function (req, reply) {
+app.post("/mp", async function (req: FastifyRequest, reply) {
   const data = await req.file();
 
-  // TODO validate geojson body
+  const ftype: string = data.filename.split(".").slice(-1)[0];
 
-  // TODO parse to postgis-format
+  // Assure file is ndjson/ndgeojson
+  if (!["ndjson", "ndgeojson"].includes(ftype)) {
+    reply
+      .status(400)
+      .send(
+        new Error(`Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`)
+      );
+  }
 
-  // TODO change destination point
-  await pump(data.file, createWriteStream(`storage/received/${data.filename}`));
+  // TODO store temporarily where?
+  const tmp_storage = `storage/received/${data.filename}`;
+  await pump(data.file, createWriteStream(tmp_storage));
+
+  setImmediate(() => {
+    featureValidator.validateAndUploadGeoFeature(tmp_storage);
+  });
 
   reply.send();
 });
