@@ -6,13 +6,12 @@ import { pipeline } from "stream";
 import { promisify } from "util";
 import { createWriteStream } from "fs";
 import fastifyMultipart from "@fastify/multipart";
-import { MultipartFile } from "@fastify/multipart";
 import { FastifyRequest } from "fastify";
-import { GeoJSONFeatureValidator } from "./ndvalidate.js";
+import { GeodataUpstreamHandler } from "./GeodataUpstreamHandler.js";
 
 const pump = promisify(pipeline);
 
-const featureValidator = new GeoJSONFeatureValidator();
+const featureValidator = new GeodataUpstreamHandler();
 
 // Instantiate Fastify with some config
 const app = fastify({
@@ -56,7 +55,7 @@ app.post("/mp", async function (req: FastifyRequest, reply) {
       );
   }
 
-  // TODO store temporarily where?
+  // temporarily store received data, for later validation of geojson content
   const tmp_storage = `storage/received/${data.filename}`;
   await pump(data.file, createWriteStream(tmp_storage));
 
