@@ -3,10 +3,9 @@ import { createInterface } from "readline";
 import * as Ajv from "ajv";
 import { readFileSync } from "fs";
 import * as path from "path";
-import Pool from "pg-pool";
 import { createWriteStream } from "fs";
-import pgcopy from "pg-copy-streams";
-
+import { PostGisConnection } from "./PostGisConnection.js";
+import { makeId } from "./makeid.js";
 // GeoJSON Feature Schema, for validation of received data
 const featureSchemaPath = path.join(process.cwd(), "src/schema/Feature.json");
 
@@ -19,7 +18,7 @@ export class GeodataUpstreamHandler {
   ajv: Ajv.default;
   featureSchema: JSON;
   validate;
-  postgres;
+  postgis;
 
   constructor() {
     this.ajv = new Ajv.default();
@@ -28,13 +27,7 @@ export class GeodataUpstreamHandler {
 
     // Database connection
     // TODO outsource auth to env
-    this.postgres = new Pool({
-      //host: "127.0.0.1",
-      database: "idp",
-      user: "idp",
-      password: "idpdev",
-      port: 8081,
-    });
+    this.postgis = new PostGisConnection();
   }
 
   /**
@@ -77,7 +70,7 @@ export class GeodataUpstreamHandler {
       //output: process.stdout,
       terminal: false,
     });
-    const tmpCsvStorage = "storage/received/" + this.makeId() + ".csv";
+    const tmpCsvStorage = "storage/validated/" + makeId() + ".csv";
     const writeStream = createWriteStream(tmpCsvStorage);
     file
       .on("line", (line) => {
@@ -90,8 +83,8 @@ export class GeodataUpstreamHandler {
         } else {
           console.log("Invalid line: " + line);
           // Stop reading if file contains erroneous features?
-          //file.close();
-          //file.removeAllListeners();
+          // file.close();
+          // file.removeAllListeners();
         }
       })
       .on("close", function () {
@@ -101,63 +94,13 @@ export class GeodataUpstreamHandler {
       });
 
     setImmediate(() => {
-      this.uploadGeoCSV(tmpCsvStorage);
-    });
-
-    if (del_file) {
-      unlink(fpath, function (err) {
-        if (err) {
-          console.error(err);
-        }
-      });
-    }
-  }
-
-  /**
-   * Generates a random string of default 16 characters.
-   * @param length amount of characters to be generated
-   * @returns
-   */
-  private makeId(length = 16): string {
-    let result = "";
-    const characters =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    const charactersLength = characters.length;
-    for (let i = 0; i < length; i++) {
-      result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
-  }
-
-  /**
-   * Streams csv file to postgres database. Deletes file after processing
-   * @param file
-   */
-  private uploadGeoCSV(file: string) {
-    this.postgres.connect(function (err, client, done) {
-      if (err) {
-        console.log(err);
-      } else if (client === undefined || done === undefined) {
-        // TODO how would this happen?
-        console.log("Client or Done is undefined!");
-      } else {
-        const stream = client.query(
-          pgcopy.from(
-            "COPY some_coordinates(geom, properties) FROM STDIN (FORMAT CSV, DELIMITER ';')"
-          )
-        );
-        const fileStream = createReadStream(file);
-
-        fileStream.on("error", done);
-        stream.on("error", done);
-        stream.on("finish", () => {
-          unlink(file, function (err) {
-            if (err) {
-              console.error(err);
-            }
-          });
+      this.postgis.uploadDataFromCsv(tmpCsvStorage);
+      if (del_file) {
+        unlink(fpath, function (err) {
+          if (err) {
+            console.error(err);
+          }
         });
-        fileStream.pipe(stream);
       }
     });
   }

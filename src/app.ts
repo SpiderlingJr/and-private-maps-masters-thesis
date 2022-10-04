@@ -8,7 +8,8 @@ import { createWriteStream } from "fs";
 import fastifyMultipart from "@fastify/multipart";
 import { FastifyRequest } from "fastify";
 import { GeodataUpstreamHandler } from "./GeodataUpstreamHandler.js";
-
+import * as path from "path";
+import { makeId } from "./makeid.js";
 const pump = promisify(pipeline);
 
 const featureValidator = new GeodataUpstreamHandler();
@@ -56,7 +57,13 @@ app.post("/mp", async function (req: FastifyRequest, reply) {
   }
 
   // temporarily store received data, for later validation of geojson content
-  const tmp_storage = `storage/received/${data.filename}`;
+  const tmp_storage = path.join(
+    process.cwd(),
+    "storage",
+    "received",
+    makeId() + ".ndjson"
+  );
+
   await pump(data.file, createWriteStream(tmp_storage));
 
   setImmediate(() => {
