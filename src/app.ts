@@ -9,10 +9,11 @@ import fastifyMultipart from "@fastify/multipart";
 import { FastifyRequest } from "fastify";
 import { GeodataUpstreamHandler } from "./GeodataUpstreamHandler.js";
 import * as path from "path";
-import { makeId } from "./makeid.js";
+import { PostGisConnection } from "./PostGisConnection.js";
 const pump = promisify(pipeline);
 
-const featureValidator = new GeodataUpstreamHandler();
+const pgConn = new PostGisConnection();
+const featureValidator = new GeodataUpstreamHandler(pgConn);
 
 // Instantiate Fastify with some config
 const app = fastify({
@@ -56,21 +57,23 @@ app.post("/mp", async function (req: FastifyRequest, reply) {
       );
   }
 
+  const jobId = await pgConn.createNewJob();
+
   // temporarily store received data, for later validation of geojson content
-  const tmp_storage = path.join(
+  const tmpStorage = path.join(
     process.cwd(),
     "storage",
     "received",
-    makeId() + ".ndjson"
+    jobId + ".ndjson"
   );
 
-  await pump(data.file, createWriteStream(tmp_storage));
+  await pump(data.file, createWriteStream(tmpStorage));
 
   setImmediate(() => {
-    featureValidator.validateAndUploadGeoFeature(tmp_storage);
+    featureValidator.validateAndUploadGeoFeature(tmpStorage, jobId);
   });
 
-  reply.send();
+  reply.send("Request posted with job id " + jobId);
 });
 
 // Declare a route
