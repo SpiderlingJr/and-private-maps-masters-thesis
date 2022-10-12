@@ -50,7 +50,7 @@ export class GeoJsonToCsvTransform extends Transform {
 
     const csv_line =
       '"' + csv_geom + '";"' + csv_properties + '";' + csv_colid + "\n";
-    console.log(csv_line);
+    //console.log(csv_line);
 
     return csv_line;
   }

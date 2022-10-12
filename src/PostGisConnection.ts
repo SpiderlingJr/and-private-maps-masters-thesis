@@ -84,7 +84,6 @@ export class PostGisConnection {
    * @param file
    */
   async uploadDataFromCsv(file: string) {
-    console.log("THIS IS AFTER PIPELINE!!!!");
     this.conn.connect(function (err, client, done) {
       if (err) {
         console.log(err);
@@ -107,7 +106,7 @@ export class PostGisConnection {
           return Promise.reject();
         });
         stream.on("finish", () => {
-          console.log("uploadFromCSv: Upload FINISHED");
+          done();
         });
         fileStream.pipe(stream);
       }

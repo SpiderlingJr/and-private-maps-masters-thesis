@@ -68,13 +68,12 @@ export class GeodataUpstreamHandler {
     validationComplete
       // Upon finishing validation, upload file if valid, else declare job failed.
       .then(() => {
-        //console.log("Now trying to upload.");
         this.postgis.uploadDataFromCsv(tmpCsvStorage);
         this.postgis.updateJob(jobId, "finished");
       })
       // Any errors mark the job as failed, no upload happens.
       .catch((err) => {
-        console.log("Error doring upload? ", err);
+        console.log("Error during upload? ", err);
         this.postgis.updateJob(jobId, "error");
       })
       // Cleanup temporarily stored files
