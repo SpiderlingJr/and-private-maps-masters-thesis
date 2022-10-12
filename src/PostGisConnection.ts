@@ -1,8 +1,8 @@
 import Pool from "pg-pool";
-import { createReadStream, unlink } from "fs";
+import { createReadStream } from "fs";
 import pgcopy from "pg-copy-streams";
 import { QueryResult } from "pg";
-
+import { unlink } from "fs";
 type JobState = "pending" | "finished" | "error";
 
 export class PostGisConnection {
@@ -84,32 +84,35 @@ export class PostGisConnection {
    * @param file
    */
   async uploadDataFromCsv(file: string) {
-    this.conn.connect(function (err, client, done) {
-      if (err) {
-        console.log(err);
-      } else if (client === undefined || done === undefined) {
-        // TODO how would this happen?
-        console.log("Client or Done is undefined!");
-      } else {
-        const stream = client.query(
-          pgcopy.from(
-            "COPY features(geom, properties, ft_collection) FROM STDIN (FORMAT CSV, DELIMITER ';')"
-          )
-        );
-        const fileStream = createReadStream(file);
+    return new Promise((resolve, reject) => {
+      this.conn.connect(function (err, client, done) {
+        if (err) {
+          console.log(err);
+        } else if (client === undefined || done === undefined) {
+          // TODO how would this happen?
+          console.log("Client or Done is undefined!");
+        } else {
+          const stream = client.query(
+            pgcopy.from(
+              "COPY features(geom, properties, ft_collection) FROM STDIN (FORMAT CSV, DELIMITER ';')"
+            )
+          );
+          const fileStream = createReadStream(file);
 
-        fileStream.on("error", (err) => {
-          console.log(err);
-        });
-        stream.on("error", (err) => {
-          console.log(err);
-          return Promise.reject();
-        });
-        stream.on("finish", () => {
-          done();
-        });
-        fileStream.pipe(stream);
-      }
+          fileStream.on("error", (err) => {
+            console.log(err);
+          });
+          stream.on("error", (err) => {
+            console.log(err);
+            reject();
+          });
+          stream.on("finish", () => {
+            resolve("");
+            done();
+          });
+          fileStream.pipe(stream);
+        }
+      });
     });
   }
 }
