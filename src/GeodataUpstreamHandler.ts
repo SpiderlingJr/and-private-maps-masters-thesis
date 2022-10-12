@@ -17,6 +17,13 @@ export class GeodataUpstreamHandler {
     this.postgis = pgConn;
   }
 
+  private async removeFile(file: string) {
+    unlink(file, function (err) {
+      if (err) {
+        console.error("Error while trying to delete file: ", err, err.stack);
+      }
+    });
+  }
   /**
    * Reads a file from path, validates it's geojson content and streams it to database
    * @param fpath path to json-file
@@ -68,8 +75,10 @@ export class GeodataUpstreamHandler {
     validationComplete
       // Upon finishing validation, upload file if valid, else declare job failed.
       .then(() => {
-        this.postgis.uploadDataFromCsv(tmpCsvStorage);
-        this.postgis.updateJob(jobId, "finished");
+        this.postgis.uploadDataFromCsv(tmpCsvStorage).then(() => {
+          this.postgis.updateJob(jobId, "finished");
+          this.removeFile(tmpCsvStorage);
+        });
       })
       // Any errors mark the job as failed, no upload happens.
       .catch((err) => {
@@ -78,16 +87,9 @@ export class GeodataUpstreamHandler {
       })
       // Cleanup temporarily stored files
       .finally(() => {
+        console.log("in finally");
         if (deleteTmpFile) {
-          unlink(fpath, function (err) {
-            if (err) {
-              console.error(
-                "Error while trying to delete file: ",
-                err,
-                err.stack
-              );
-            }
-          });
+          this.removeFile(fpath);
         }
       });
   }
