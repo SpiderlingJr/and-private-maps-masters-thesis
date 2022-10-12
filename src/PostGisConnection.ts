@@ -54,7 +54,7 @@ export class PostGisConnection {
   async updateJob(jobId: string, state: JobState): Promise<void> {
     return new Promise((resolve, reject) => {
       if (this.isJobState(state)) {
-        const query = `UPDATE jobs SET job_state = ${state} WHERE job_id = ${jobId}`;
+        const query = `UPDATE jobs SET job_state = '${state}' WHERE job_id = '${jobId}'`;
         this.executeQueryWithReturn(query);
         resolve();
       } else {
