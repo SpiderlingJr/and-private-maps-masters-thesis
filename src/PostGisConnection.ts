@@ -1,7 +1,7 @@
 import Pool from "pg-pool";
 import { createReadStream } from "fs";
 import pgcopy from "pg-copy-streams";
-import { QueryResult } from "pg";
+import { Query, QueryResult } from "pg";
 import { unlink } from "fs";
 type JobState = "pending" | "finished" | "error";
 
@@ -77,6 +77,21 @@ export class PostGisConnection {
         }
       });
     });
+  }
+
+  countTableEntries(table: string): Promise<QueryResult> {
+    const countEntries = `SELECT COUNT (*) from ${table}`;
+    return this.executeQueryWithReturn(countEntries);
+  }
+
+  dropJob(job: string): Promise<QueryResult> {
+    const removeJobQuery = `DELETE FROM JOBS WHERE job_id = '${job}'`;
+    return this.executeQueryWithReturn(removeJobQuery);
+  }
+
+  dropFeaturesByColid(colId: string): Promise<QueryResult> {
+    const removeFeaturesQuery = `DELETE FROM FEATURES WHERE ft_collection = '${colId}'`;
+    return this.executeQueryWithReturn(removeFeaturesQuery);
   }
 
   /**
