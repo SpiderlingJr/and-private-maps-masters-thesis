@@ -73,7 +73,7 @@ app.post("/mp", async function (req: FastifyRequest, reply) {
     featureValidator.validateAndUploadGeoFeature(tmpStorage, jobId);
   });
 
-  reply.send("Request posted with job id " + jobId);
+  reply.send(jobId);
 });
 
 // Declare a route
