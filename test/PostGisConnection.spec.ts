@@ -35,23 +35,23 @@ test("upload valid_file_1, then delete those from db.", async (t) => {
   const pgconn = new PostGisConnection();
 
   const preUploadRes = await pgconn.countTableEntries("features");
-  const numFeaturesPreUpload: number = preUploadRes.rows[0].count;
+  const numFeaturesPreUpload = preUploadRes.rows[0].count;
 
-  const resolveValidUploadRes = await pgconn.uploadDataFromCsv(validFile1);
+  await pgconn.uploadDataFromCsv(validFile1);
 
   const postUploadRes = await pgconn.countTableEntries("features");
   const numFeaturesPostUpload: number = postUploadRes.rows[0].count;
 
   const numFeaturesDiff = numFeaturesPostUpload - numFeaturesPreUpload;
-  t.comment(`${numFeaturesPostUpload}  ${numFeaturesPreUpload}`);
   t.equal(numFeaturesDiff, numLinesInValid1);
-  return numFeaturesPreUpload;
 
-  // TODO REMOVE THOSE LINES
-  /*const removeRes = await pgconn.dropFeaturesByColid(testColId);
+  // Remove inserted lines
+  t.afterEach(async () => {
+    await pgconn.dropFeaturesByColid(testColId);
 
-  const postDeleteRes = await pgconn.countTableEntries("features");
-  const numFeaturesPostDelete: number = postDeleteRes.rows[0].count;
+    const postDeleteRes = await pgconn.countTableEntries("features");
+    const numFeaturesPostDelete: number = postDeleteRes.rows[0].count;
 
-  t.equal(numFeaturesPreUpload, numFeaturesPostDelete);*/
-}).then();
+    t.equal(numFeaturesPreUpload, numFeaturesPostDelete);
+  });
+});
