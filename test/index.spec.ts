@@ -17,3 +17,23 @@ test('requests the "/" route', async (t) => {
     message: "querystring must have required property 'foo'",
   });
 });
+
+test('request "/get" route with valid collection id', async (t) => {
+  t.todo("implement this");
+});
+
+test('request "/get" route with no further information', async (t) => {
+  t.todo("implement this");
+});
+
+test('request "/get" route with invalid collection id', async (t) => {
+  t.todo("implement this");
+});
+
+test('request "/post" route with ndjson fily as multipart body', async (t) => {
+  t.todo("implement this");
+});
+
+test('request "/post" route without multipart body', async (t) => {
+  t.todo("implement this");
+});
