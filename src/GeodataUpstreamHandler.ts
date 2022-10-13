@@ -56,23 +56,22 @@ export class GeodataUpstreamHandler {
       (err) => {
         if (err) {
           console.error("Pipeline error", err);
-          //validationPipeline.emit("error");
         }
       }
     );
 
     const validationComplete = new Promise((res, rej) => {
+      validationPipeline.once("error", () => {
+        //console.log("Validation Pipeline FAILED");
+        rej("rip");
+      });
       validationPipeline.once("finish", () => {
         //console.log("Validation Pipeline finished");
         res("ok");
       });
-      validationPipeline.once("error", () => {
-        //console.log("Validation Pipeline FAILED");
-        rej();
-      });
     });
 
-    validationComplete
+    await validationComplete
       // Upon finishing validation, upload file if valid, else declare job failed.
       .then(() => {
         this.postgis.uploadDataFromCsv(tmpCsvStorage).then(() => {
@@ -82,12 +81,12 @@ export class GeodataUpstreamHandler {
       })
       // Any errors mark the job as failed, no upload happens.
       .catch((err) => {
-        console.log("Error during upload? ", err);
         this.postgis.updateJob(jobId, "error");
+        throw new Error(err);
+        //console.error("Error during upload? ", err);
       })
       // Cleanup temporarily stored files
       .finally(() => {
-        console.log("in finally");
         if (deleteTmpFile) {
           this.removeFile(fpath);
         }

@@ -9,12 +9,6 @@ export class PostGisConnection {
   conn;
 
   constructor() {
-    console.log(
-      process.env.PG_DB,
-      process.env.PG_USER,
-      process.env.PG_PW,
-      process.env.PG_PORT
-    );
     // Database connection
     this.conn = new Pool({
       //host: "127.0.0.1",
