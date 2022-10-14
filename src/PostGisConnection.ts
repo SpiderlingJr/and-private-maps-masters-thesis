@@ -2,7 +2,6 @@ import Pool from "pg-pool";
 import { createReadStream } from "fs";
 import pgcopy from "pg-copy-streams";
 import { Query, QueryResult } from "pg";
-import { unlink } from "fs";
 type JobState = "pending" | "finished" | "error";
 
 export class PostGisConnection {
@@ -71,6 +70,35 @@ export class PostGisConnection {
         }
       });
     });
+  }
+
+  async getFeaturesByCollectionId(colId: string, limit = 0) {
+    let getFeaturesQuery = `SELECT * FROM features WHERE ft_collection = '${colId}' `;
+    if (limit > 0) {
+      getFeaturesQuery += `LIMIT ${limit}`;
+    }
+    console.log(getFeaturesQuery);
+    try {
+      const dbRes = await this.executeQueryWithReturn(getFeaturesQuery);
+      return dbRes.rows;
+    } catch (err) {
+      throw new Error("No such collection");
+    }
+  }
+  async getCollectionById(colId: string): Promise<object> {
+    const getCollectionQuery = `SELECT * FROM collections WHERE coll_id = '${colId}'`;
+
+    try {
+      const dbRes = await this.executeQueryWithReturn(getCollectionQuery);
+
+      if (dbRes.rows.length > 0) {
+        return dbRes.rows;
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      throw new Error("No such collection");
+    }
   }
 
   countTableEntries(table: string): Promise<QueryResult> {

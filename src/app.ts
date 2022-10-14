@@ -1,4 +1,4 @@
-import { fastify } from "fastify";
+import { fastify, RequestParamsDefault } from "fastify";
 import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
 import closeWithGrace from "close-with-grace";
@@ -75,6 +75,57 @@ app.post("/mp", async function (req: FastifyRequest, reply) {
 
   reply.send(jobId);
 });
+
+interface RequestParams {
+  colId: string;
+  featureId: string;
+}
+// Returns collection info if collection exists, else 404
+app.get("/collections/:colId", function (request, reply) {
+  const { colId } = request.params as RequestParams;
+
+  pgConn
+    .getCollectionById(colId)
+    .then((response) => {
+      reply.code(200);
+      reply.send(response);
+    })
+    .catch((err) => {
+      reply.code(404);
+      reply.send(err);
+    });
+});
+
+app.get(
+  "/collections/:colId/items",
+  {
+    schema: {
+      querystring: Type.Object({
+        limit: Type.Optional(Type.String()),
+        datetime: Type.Optional(Type.String()),
+        bbox: Type.Optional(Type.String()),
+      }),
+    },
+  },
+  function (request, reply) {
+    const { colId } = request.params as RequestParams;
+
+    const limit = request.query.limit;
+    const datetime = request.query.datetime;
+    const bbox = request.query.bbox;
+
+    pgConn
+      .getFeaturesByCollectionId(colId, Number(limit) ? Number(limit) : 0)
+      .then((response) => {
+        reply.code(200);
+        reply.send(response);
+      })
+      .catch((err) => {
+        reply.code(404);
+        reply.send(err);
+      });
+  }
+);
 
 // Declare a route
 app.get(
