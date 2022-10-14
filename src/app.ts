@@ -15,6 +15,12 @@ const pump = promisify(pipeline);
 const pgConn = new PostGisConnection();
 const featureValidator = new GeodataUpstreamHandler(pgConn);
 
+interface RequestParams {
+  featId: string;
+  colId: string;
+  featureId: string;
+}
+
 // Instantiate Fastify with some config
 const app = fastify({
   logger: {
@@ -76,10 +82,6 @@ app.post("/mp", async function (req: FastifyRequest, reply) {
   reply.send(jobId);
 });
 
-interface RequestParams {
-  colId: string;
-  featureId: string;
-}
 // Returns collection info if collection exists, else 404
 app.get("/collections/:colId", function (request, reply) {
   const { colId } = request.params as RequestParams;
@@ -116,6 +118,33 @@ app.get(
 
     pgConn
       .getFeaturesByCollectionId(colId, Number(limit) ? Number(limit) : 0)
+      .then((response) => {
+        reply.code(200);
+        reply.send(response);
+      })
+      .catch((err) => {
+        reply.code(404);
+        reply.send(err);
+      });
+  }
+);
+
+app.get(
+  "/collections/:colId/items/:featId",
+  {
+    schema: {
+      querystring: Type.Object({
+        limit: Type.Optional(Type.String()),
+        datetime: Type.Optional(Type.String()),
+        bbox: Type.Optional(Type.String()),
+      }),
+    },
+  },
+  function (request, reply) {
+    const { colId, featId } = request.params as RequestParams;
+
+    pgConn
+      .getFeaturesByCollectionIdAndFeatureId(colId, featId)
       .then((response) => {
         reply.code(200);
         reply.send(response);

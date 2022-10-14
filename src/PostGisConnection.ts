@@ -72,7 +72,12 @@ export class PostGisConnection {
     });
   }
 
-  async getFeaturesByCollectionId(colId: string, limit = 0) {
+  async getFeaturesByCollectionId(
+    colId: string,
+    limit = 0,
+    bbox?: undefined,
+    date?: undefined
+  ) {
     let getFeaturesQuery = `SELECT * FROM features WHERE ft_collection = '${colId}' `;
     if (limit > 0) {
       getFeaturesQuery += `LIMIT ${limit}`;
@@ -98,6 +103,22 @@ export class PostGisConnection {
       }
     } catch (err) {
       throw new Error("No such collection");
+    }
+  }
+
+  async getFeaturesByCollectionIdAndFeatureId(colId: string, featId: string) {
+    const getFeatureQuery = `SELECT * FROM features WHERE ft_collection = '${colId}' and feature_id = '${featId}'`;
+
+    try {
+      const dbRes = await this.executeQueryWithReturn(getFeatureQuery);
+
+      if (dbRes.rows.length > 0) {
+        return dbRes.rows;
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      throw new Error("No such collection or features");
     }
   }
 
