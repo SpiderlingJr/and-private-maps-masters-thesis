@@ -1,10 +1,10 @@
 import { test } from "tap";
 import { app } from "../src/app.js";
 
-test('requests the "/" route', async (t) => {
+test('requests the "/randomRoute" route', async (t) => {
   const response = await app.inject({
     method: "GET",
-    url: "/",
+    url: "/randomRoute",
     headers: {
       "content-type": "application/json",
     },
@@ -16,6 +16,22 @@ test('requests the "/" route', async (t) => {
     error: "Bad Request",
     message: "querystring must have required property 'foo'",
   });
+});
+
+test('requests the "/" route (Landing Page)', async (t) => {
+  const response = await app.inject({
+    method: "GET",
+    url: "/",
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+  t.equal(response.statusCode, 200, "returns a status code of 200");
+  /*t.same(JSON.parse(response.body), {
+    statusCode: 200,
+    error: "Bad Request",
+    message: "querystring must have required property 'foo'",
+  });*/
 });
 
 test('request "/get" route with valid collection id', async (t) => {
