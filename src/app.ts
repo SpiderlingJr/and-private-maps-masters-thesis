@@ -12,6 +12,7 @@ import * as path from "path";
 import { PostGisConnection } from "./PostGisConnection.js";
 const pump = promisify(pipeline);
 
+import appLinks from "./data/appLinks.js";
 const pgConn = new PostGisConnection();
 const featureValidator = new GeodataUpstreamHandler(pgConn);
 
@@ -156,10 +157,9 @@ app.get(
   }
 );
 
-/*
 // Declare a route
 app.get(
-  "/",
+  "/randomRoute",
   {
     schema: {
       querystring: Type.Object({
@@ -171,62 +171,16 @@ app.get(
   function (request, reply) {
     reply.send({ foo: request.query.foo });
   }
-); 
-*/
+);
+
 // Landing Page
-
-class Link {
-  constructor(
-    readonly href: string,
-    readonly rel: string,
-    readonly type: string,
-    readonly title: string
-  ) {}
-}
-
 app.get("/", function (request, reply) {
   let response = {
     title: "AND Private Maps API Definition",
     description: "Some descriptive lorem ispum",
   };
 
-  const links = [];
-
-  const linkRoot = new Link("/", "self", "application/json", "this document");
-  const linkConformance = new Link(
-    "/conformance",
-    "conformance",
-    "application/json",
-    "OGC API conformance classes implemented by this server"
-  );
-  const linkCollections = new Link(
-    "/collections",
-    "data",
-    "application/json",
-    "Information about feature collections"
-  );
-  const linkCollectionsByCollectionId = new Link(
-    "/collections/<collection_id>",
-    "data",
-    "application/json",
-    "Features in requested Collection"
-  );
-  const linkFeatureByCollectionAndFeatureId = new Link(
-    "/collections/<collection_id>/items/<feature_id>",
-    "data",
-    "application/json",
-    "Feature in requested Collection with requested Feature Id."
-  );
-
-  links.push(
-    linkRoot,
-    linkConformance,
-    linkCollections,
-    linkCollectionsByCollectionId,
-    linkFeatureByCollectionAndFeatureId
-  );
-
-  response = Object.assign(response, { links: links });
+  response = Object.assign(response, { links: appLinks });
 
   reply.send(response);
 });
