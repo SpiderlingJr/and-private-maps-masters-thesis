@@ -30,6 +30,15 @@ export class PostGisConnection {
   }
 
   /**
+   * Lists all available collections
+   * @returns QueryResult with all collections
+   */
+  async listCollections(): Promise<QueryResult> {
+    const query = "SELECT * FROM collections";
+    const result = await this.executeQueryWithReturn(query);
+    return result;
+  }
+  /**
    * Creates a new job with default state "pending"
    * @returns
    */

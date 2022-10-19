@@ -1,9 +1,5 @@
-type Link = {
-  href: string;
-  rel: string;
-  type: string;
-  title: string;
-};
+import { Link } from "../types/ogc.js";
+
 const mimeTypes = {
   json: "application/json",
   htmlText: "html/text",

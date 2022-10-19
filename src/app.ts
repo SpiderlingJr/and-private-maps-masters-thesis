@@ -12,7 +12,9 @@ import * as path from "path";
 import { PostGisConnection } from "./PostGisConnection.js";
 const pump = promisify(pipeline);
 
-import appLinks from "./data/appLinks.js";
+import appLinks from "./data/landingPage.js";
+import conformance from "./data/conformance.js";
+
 const pgConn = new PostGisConnection();
 const featureValidator = new GeodataUpstreamHandler(pgConn);
 
@@ -50,52 +52,49 @@ app.register(fastifyMultipart.default, {
   },
 });
 
-app.post("/mp", async function (req: FastifyRequest, reply) {
-  const data = await req.file();
+// Landing Page
+app.get("/", function (request, reply) {
+  const response = {
+    title: "AND Private Maps API Definition",
+    description: "Some descriptive lorem ispum",
+    links: appLinks,
+  };
 
-  const ftype: string = data.filename.split(".").slice(-1)[0];
-
-  // Assure file is ndjson/ndgeojson
-  if (!["ndjson", "ndgeojson"].includes(ftype)) {
-    reply
-      .status(400)
-      .send(
-        new Error(`Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`)
-      );
-  }
-
-  const jobId = await pgConn.createNewJob();
-
-  // temporarily store received data, for later validation of geojson content
-  const tmpStorage = path.join(
-    process.cwd(),
-    "storage",
-    "received",
-    jobId + ".ndjson"
-  );
-
-  await pump(data.file, createWriteStream(tmpStorage));
-
-  setImmediate(() => {
-    featureValidator.validateAndUploadGeoFeature(tmpStorage, jobId);
-  });
-
-  reply.send(jobId);
+  reply.send(response);
 });
 
-// Returns collection info if collection exists, else 404
-app.get("/collections/:colId", function (request, reply) {
-  const { colId } = request.params as RequestParams;
+// Conformance
+app.get("/conformance", function (request, reply) {
+  reply.send(conformance);
+});
+
+const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
+  if (err) {
+    app.log.error(err);
+  }
+  await app.close();
+};
+
+// delay is the number of milliseconds for the graceful close to finish
+const closeListeners = closeWithGrace(
+  {
+    delay: parseInt(process.env.FASTIFY_CLOSE_GRACE_DELAY || "") || 500,
+  },
+  handler
+);
+
+app.get("/collections", function (request, reply) {
+  //
 
   pgConn
-    .getCollectionById(colId)
-    .then((response) => {
+    .listCollections()
+    .then((collections) => {
       reply.code(200);
-      reply.send(response);
+      reply.send(collections);
     })
     .catch((err) => {
-      reply.code(404);
-      reply.send(err);
+      reply.code(500);
+      reply.send({ description: "Could not fetch collections." });
     });
 });
 
@@ -173,32 +172,54 @@ app.get(
   }
 );
 
-// Landing Page
-app.get("/", function (request, reply) {
-  let response = {
-    title: "AND Private Maps API Definition",
-    description: "Some descriptive lorem ispum",
-  };
+app.post("/mp", async function (req: FastifyRequest, reply) {
+  const data = await req.file();
 
-  response = Object.assign(response, { links: appLinks });
+  const ftype: string = data.filename.split(".").slice(-1)[0];
 
-  reply.send(response);
+  // Assure file is ndjson/ndgeojson
+  if (!["ndjson", "ndgeojson"].includes(ftype)) {
+    reply
+      .status(400)
+      .send(
+        new Error(`Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`)
+      );
+  }
+
+  const jobId = await pgConn.createNewJob();
+
+  // temporarily store received data, for later validation of geojson content
+  const tmpStorage = path.join(
+    process.cwd(),
+    "storage",
+    "received",
+    jobId + ".ndjson"
+  );
+
+  await pump(data.file, createWriteStream(tmpStorage));
+
+  setImmediate(() => {
+    featureValidator.validateAndUploadGeoFeature(tmpStorage, jobId);
+  });
+
+  reply.send(jobId);
 });
 
-const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
-  if (err) {
-    app.log.error(err);
-  }
-  await app.close();
-};
+// Returns collection info if collection exists, else 404
+app.get("/collections/:colId", function (request, reply) {
+  const { colId } = request.params as RequestParams;
 
-// delay is the number of milliseconds for the graceful close to finish
-const closeListeners = closeWithGrace(
-  {
-    delay: parseInt(process.env.FASTIFY_CLOSE_GRACE_DELAY || "") || 500,
-  },
-  handler
-);
+  pgConn
+    .getCollectionById(colId)
+    .then((response) => {
+      reply.code(200);
+      reply.send(response);
+    })
+    .catch((err) => {
+      reply.code(404);
+      reply.send(err);
+    });
+});
 
 app.addHook("onClose", (instance, done) => {
   closeListeners.uninstall();
