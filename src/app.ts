@@ -172,7 +172,7 @@ app.get(
   }
 );
 
-app.post("/mp", async function (req: FastifyRequest, reply) {
+app.post("/data", async function (req: FastifyRequest, reply) {
   const data = await req.file();
 
   const ftype: string = data.filename.split(".").slice(-1)[0];
@@ -203,6 +203,21 @@ app.post("/mp", async function (req: FastifyRequest, reply) {
   });
 
   reply.send(jobId);
+});
+
+// Insert data into db if not already exists
+app.put("/data", async function name(req, reply) {
+  //
+});
+
+// Insert data into db if already exists
+app.patch("/data", async function name(req, reply) {
+  //
+});
+
+// Delete existing data
+app.delete("/data", async function name(req, reply) {
+  //
 });
 
 // Returns collection info if collection exists, else 404
