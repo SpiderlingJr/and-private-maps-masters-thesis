@@ -207,12 +207,70 @@ app.post("/data", async function (req: FastifyRequest, reply) {
 
 // Insert data into db if not already exists
 app.put("/data", async function name(req, reply) {
-  //
+  const data = await req.file();
+
+  const ftype: string = data.filename.split(".").slice(-1)[0];
+
+  // Assure file is ndjson/ndgeojson
+  if (!["ndjson", "ndgeojson"].includes(ftype)) {
+    reply
+      .status(400)
+      .send(
+        new Error(`Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`)
+      );
+  }
+
+  const jobId = await pgConn.createNewJob();
+
+  // temporarily store received data, for later validation of geojson content
+  const tmpStorage = path.join(
+    process.cwd(),
+    "storage",
+    "received",
+    jobId + ".ndjson"
+  );
+
+  await pump(data.file, createWriteStream(tmpStorage));
+
+  setImmediate(() => {
+    featureValidator.validateAndPutGeoFeature(tmpStorage, jobId);
+  });
+
+  reply.send(jobId);
 });
 
 // Insert data into db if already exists
 app.patch("/data", async function name(req, reply) {
-  //
+  const data = await req.file();
+
+  const ftype: string = data.filename.split(".").slice(-1)[0];
+
+  // Assure file is ndjson/ndgeojson
+  if (!["ndjson", "ndgeojson"].includes(ftype)) {
+    reply
+      .status(400)
+      .send(
+        new Error(`Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`)
+      );
+  }
+
+  const jobId = await pgConn.createNewJob();
+
+  // temporarily store received data, for later validation of geojson content
+  const tmpStorage = path.join(
+    process.cwd(),
+    "storage",
+    "received",
+    jobId + ".ndjson"
+  );
+
+  await pump(data.file, createWriteStream(tmpStorage));
+
+  setImmediate(() => {
+    featureValidator.validateAndPatchGeoFeature(tmpStorage, jobId);
+  });
+
+  reply.send(jobId);
 });
 
 // Delete existing data
