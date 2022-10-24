@@ -2,12 +2,12 @@ import { createReadStream, unlink } from "fs";
 
 import { createWriteStream } from "fs";
 import { PostGisConnection } from "./PostGisConnection.js";
-import { makeId } from "./makeid.js";
-import { GeoJsonToCsvTransform } from "./GeoJsonToCsvTransform.js";
-import { GeoValidationTransform } from "./GeoValidationTransform.js";
-
+import { makeId } from "./MakeId.js";
 import { pipeline } from "stream";
-import { ReadlineTransform } from "./ReadLineTransform.js";
+import { GeoJsonToCsvTransform } from "./transforms/GeoJsonToCsvTransform.js";
+import { GeoValidationTransform } from "./transforms/GeoValidationTransform.js";
+import { ReadlineTransform } from "./transforms/ReadLineTransform.js";
+import { JobState } from "../entities/jobs.js";
 
 export class GeodataUpstreamHandler {
   postgis;
@@ -74,14 +74,24 @@ export class GeodataUpstreamHandler {
     await validationComplete
       // Upon finishing validation, upload file if valid, else declare job failed.
       .then(() => {
-        this.postgis.uploadDataFromCsv(tmpCsvStorage).then(() => {
-          this.postgis.updateJob(jobId, "finished");
-          this.removeFile(tmpCsvStorage);
-        });
+        this.postgis
+          .pgCopyInsert(tmpCsvStorage)
+          .then(() => {
+            this.postgis.updateJob(jobId, JobState.FINISHED);
+            this.removeFile(tmpCsvStorage);
+          })
+          .catch((err) => {
+            this.postgis.updateJob(
+              jobId,
+              JobState.ERROR,
+              "Could not copy stream to db after validation"
+            );
+            throw new Error(err);
+          });
       })
       // Any errors mark the job as failed, no upload happens.
       .catch((err) => {
-        this.postgis.updateJob(jobId, "error");
+        this.postgis.updateJob(jobId, JobState.ERROR);
         throw new Error(err);
         //console.error("Error during upload? ", err);
       })
