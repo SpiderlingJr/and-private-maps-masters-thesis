@@ -7,9 +7,9 @@ import { promisify } from "util";
 import { createWriteStream } from "fs";
 import fastifyMultipart from "@fastify/multipart";
 import { FastifyRequest } from "fastify";
-import { GeodataUpstreamHandler } from "./GeodataUpstreamHandler.js";
+import { GeodataUpstreamHandler } from "./util/GeodataUpstreamHandler.js";
 import * as path from "path";
-import { PostGisConnection } from "./PostGisConnection.js";
+import { PostGisConnection } from "./util/PostGisConnection.js";
 const pump = promisify(pipeline);
 
 import appLinks from "./data/landingPage.js";
@@ -84,8 +84,6 @@ const closeListeners = closeWithGrace(
 );
 
 app.get("/collections", function (request, reply) {
-  //
-
   pgConn
     .listCollections()
     .then((collections) => {
@@ -117,7 +115,10 @@ app.get(
     const bbox = request.query.bbox;
 
     pgConn
-      .getFeaturesByCollectionId(colId, Number(limit) ? Number(limit) : 0)
+      .getFeaturesByCollectionId(
+        colId,
+        Number(limit) ? Number(limit) : undefined
+      )
       .then((response) => {
         reply.code(200);
         reply.send(response);
@@ -144,13 +145,18 @@ app.get(
     const { colId, featId } = request.params as RequestParams;
 
     pgConn
-      .getFeaturesByCollectionIdAndFeatureId(colId, featId)
+      .getFeatureByCollectionIdAndFeatureId(colId, featId)
       .then((response) => {
-        reply.code(200);
-        reply.send(response);
+        //const a = JSON.parse(response);
+        if (response.length > 0) {
+          reply.code(200);
+          reply.send(response);
+        } else {
+          reply.code(404).send();
+        }
       })
       .catch((err) => {
-        reply.code(404);
+        reply.code(400);
         reply.send(err);
       });
   }
@@ -205,6 +211,7 @@ app.post("/data", async function (req: FastifyRequest, reply) {
   reply.send(jobId);
 });
 
+/*
 // Insert data into db if not already exists
 app.put("/data", async function name(req, reply) {
   const data = await req.file();
@@ -238,7 +245,8 @@ app.put("/data", async function name(req, reply) {
 
   reply.send(jobId);
 });
-
+*/
+/*
 // Insert data into db if already exists
 app.patch("/data", async function name(req, reply) {
   const data = await req.file();
@@ -269,7 +277,6 @@ app.patch("/data", async function name(req, reply) {
   setImmediate(() => {
     featureValidator.validateAndPatchGeoFeature(tmpStorage, jobId);
   });
-
   reply.send(jobId);
 });
 
@@ -278,6 +285,8 @@ app.delete("/data", async function name(req, reply) {
   //
 });
 
+*/
+/*
 // Returns collection info if collection exists, else 404
 app.get("/collections/:colId", function (request, reply) {
   const { colId } = request.params as RequestParams;
@@ -298,5 +307,5 @@ app.addHook("onClose", (instance, done) => {
   closeListeners.uninstall();
   done();
 });
-
+*/
 export { app };
