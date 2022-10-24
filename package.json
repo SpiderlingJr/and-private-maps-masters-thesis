@@ -40,6 +40,7 @@
     "@fastify/multipart": "^7.1.2",
     "@fastify/type-provider-typebox": "^2.3.0",
     "@sinclair/typebox": "^0.24.41",
+    "@types/geojson": "^7946.0.10",
     "@types/jsonstream": "^0.8.30",
     "@types/pg": "^8.6.5",
     "@types/pg-copy-streams": "^1.2.1",
@@ -49,8 +50,10 @@
     "fastify": "^4.5.3",
     "fastify-multipart": "^5.4.0",
     "fastify-plugin": "^4.2.1",
+    "geojson": "^0.5.0",
     "pg": "^8.8.0",
     "pg-pool": "^3.5.2",
+    "typeorm": "^0.3.10",
     "util.promisify": "^1.1.1",
     "wellknown": "^0.5.0"
   },
