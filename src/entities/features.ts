@@ -8,7 +8,7 @@ import {
 } from "typeorm";
 
 import { Geometry } from "geojson";
-import { Collections } from "./collections.js";
+import { Collections } from "src/entities/collections.js";
 
 @Entity("features_test")
 export class Features extends BaseEntity {

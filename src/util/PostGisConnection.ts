@@ -1,14 +1,13 @@
 import { createReadStream } from "fs";
 import "reflect-metadata";
-import { Features } from "../entities/features.js";
-import { Collections } from "../entities/collections.js";
-import { Jobs, JobState } from "../entities/jobs.js";
+import { Features } from "src/entities/features.js";
+import { Collections } from "src/entities/collections.js";
+import { Jobs, JobState } from "src/entities/jobs.js";
 import { DataSource } from "typeorm";
 
 import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner.js";
 import pgcopy from "pg-copy-streams";
 import { pipeline } from "stream/promises";
-//type JobState = "pending" | "finished" | "error";
 
 export class PostGisConnection {
   conn: DataSource;
@@ -124,5 +123,45 @@ export class PostGisConnection {
         )
       )
     );
+  }
+
+  async listCollections() {
+    const colls = Collections.find();
+    return colls;
+  }
+
+  async getCollectionById(colId: string) {
+    const coll = Collections.find({ where: { coll_id: colId } });
+
+    return coll;
+  }
+  async getFeaturesByCollectionId(colId: string, limit?: number) {
+    const feats = Features.createQueryBuilder()
+      .where("ft_collection = :id", {
+        id: colId,
+      })
+      .limit(limit)
+      .execute();
+
+    return feats;
+  }
+
+  async getFeatureByCollectionIdAndFeatureId(colId: string, featId: string) {
+    const feat = Features.createQueryBuilder()
+      .where("ft_collection = :col_id", { col_id: colId })
+      .andWhere("feature_id = :ft_id", { ft_id: featId })
+      .execute();
+
+    return feat;
+  }
+
+  // FOR TESTING ----------
+  async countJobs() {
+    // = this.conn.manager.find(Jobs);
+    return Jobs.count();
+  }
+
+  async countFeatures() {
+    return Features.count();
   }
 }
