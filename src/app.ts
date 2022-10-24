@@ -130,6 +130,29 @@ app.get(
   }
 );
 
+// Returns collection info if collection exists, else 404
+app.get("/collections/:colId", function (request, reply) {
+  const { colId } = request.params as RequestParams;
+
+  pgConn
+    .getCollectionById(colId)
+    .then((response) => {
+      if (response.length > 0) {
+        reply.code(200).send(response);
+      } else {
+        reply.code(404).send();
+      }
+    })
+    .catch((err) => {
+      reply.code(404).send(err);
+    });
+});
+
+app.addHook("onClose", (instance, done) => {
+  closeListeners.uninstall();
+  done();
+});
+
 app.get(
   "/collections/:colId/items/:featId",
   {
@@ -286,26 +309,5 @@ app.delete("/data", async function name(req, reply) {
 });
 
 */
-/*
-// Returns collection info if collection exists, else 404
-app.get("/collections/:colId", function (request, reply) {
-  const { colId } = request.params as RequestParams;
 
-  pgConn
-    .getCollectionById(colId)
-    .then((response) => {
-      reply.code(200);
-      reply.send(response);
-    })
-    .catch((err) => {
-      reply.code(404);
-      reply.send(err);
-    });
-});
-
-app.addHook("onClose", (instance, done) => {
-  closeListeners.uninstall();
-  done();
-});
-*/
 export { app };
