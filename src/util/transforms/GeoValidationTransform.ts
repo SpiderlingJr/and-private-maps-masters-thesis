@@ -7,14 +7,14 @@ import { readFileSync } from "fs";
 const featureSchemaPath = path.join(process.cwd(), "src/schema/Feature.json");
 
 export class GeoValidationTransform extends Transform {
-  ajv: Ajv.default;
+  ajv: Ajv;
   featureSchema: JSON;
   validate;
 
   constructor(options: TransformOptions = {}) {
     super({ ...options });
 
-    this.ajv = new Ajv.default();
+    this.ajv = new Ajv();
     this.featureSchema = this.loadFeatureSchema();
     this.validate = this.ajv.compile(this.featureSchema);
   }
