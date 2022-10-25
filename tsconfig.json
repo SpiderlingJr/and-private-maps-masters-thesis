@@ -2,13 +2,17 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
-    "esModuleInterop": false,
+    "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noEmitOnError": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "strictPropertyInitialization": false,
-    "moduleResolution": "node"
-  }
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "sourceMap": true,
+    "baseUrl": "."
+  },
+  "include": ["src/**/*"]
 }
