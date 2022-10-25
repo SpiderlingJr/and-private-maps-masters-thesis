@@ -8,18 +8,16 @@ test("validation pipeline passthrough on valid data", async (t) => {
   const dbConn = new PostGisConnection();
   const handler = new GeodataUpstreamHandler(dbConn);
 
-  const resolving_promise = handler.validateAndUploadGeoFeature(
-    valid_file,
-    uuid_for_valid,
-    false
-  );
+  const resolving_promise = handler
+    .validateAndUploadGeoFeature(valid_file, uuid_for_valid, false)
+    .finally(async () => {
+      await dbConn.dropFeaturesByColid(uuid_for_valid);
+      await dbConn.close();
+    });
 
   t.resolves(resolving_promise);
-
-  t.afterEach(async () => {
-    dbConn.dropFeaturesByColid(uuid_for_valid);
-    await dbConn.close();
-  });
+  //await dbConn.dropFeaturesByColid(uuid_for_valid);
+  //await dbConn.close();
 });
 /*
 test("validation pipeline error on invalid data", async (t) => {
