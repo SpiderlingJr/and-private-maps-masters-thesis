@@ -1,4 +1,3 @@
-/*
 import { test } from "tap";
 import { PostGisConnection } from "src/util/PostGisConnection.js";
 
@@ -19,6 +18,8 @@ test("add new job, then remove it", async (t) => {
   const jobs_t2 = await pgconn.countJobs();
 
   t.equal(jobs_t0, jobs_t2);
+
+  await pgconn.close();
 });
 
 test("generate new collection, then remove it", async (t) => {
@@ -50,6 +51,6 @@ test("upload valid_file_1, then delete those from db.", async (t) => {
 
     t.equal(features_t0, features_t2);
   });
-});
 
-*/
+  pgconn.close();
+});
