@@ -14,6 +14,7 @@ const pump = promisify(pipeline);
 
 import appLinks from "./data/landingPage.js";
 import conformance from "./data/conformance.js";
+import { REPL_MODE_SLOPPY } from "repl";
 
 const pgConn = new PostGisConnection();
 const featureValidator = new GeodataUpstreamHandler(pgConn);
@@ -22,6 +23,13 @@ interface RequestParams {
   featId: string;
   colId: string;
   featureId: string;
+}
+
+interface TileQueryParams {
+  collId: string;
+  z: number;
+  x: number;
+  y: number;
 }
 
 // Instantiate Fastify with some config
@@ -148,6 +156,12 @@ app.get("/collections/:colId", function (request, reply) {
     });
 });
 
+app.get("/newzea", async function (req, reply) {
+  const mvt = await pgConn.mvtDummyData();
+
+  reply.code(200).send(mvt);
+});
+
 app.addHook("onClose", (instance, done) => {
   closeListeners.uninstall();
   done();
@@ -234,6 +248,12 @@ app.post("/data", async function (req: FastifyRequest, reply) {
   reply.send(jobId);
 });
 
+app.get("/:collId/:z/:x/:y", function (request, reply) {
+  const { collId, z, x, y } = request.params as TileQueryParams;
+
+  pgConn.getMVT(collId, z, x, y);
+  reply.send(`Queried ${collId} z:${z} x:${x} y:${y}`);
+});
 /*
 // Insert data into db if not already exists
 app.put("/data", async function name(req, reply) {
