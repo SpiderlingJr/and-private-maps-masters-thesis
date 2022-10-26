@@ -54,7 +54,7 @@ const app = fastify({
   },
 }).withTypeProvider<TypeBoxTypeProvider>();
 
-app.register(fastifyMultipart.default, {
+app.register(fastifyMultipart, {
   limits: {
     files: 1, // cannot handle more than 1 file atm
   },

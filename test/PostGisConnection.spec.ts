@@ -1,5 +1,5 @@
 import { test } from "tap";
-import { PostGisConnection } from "src/util/PostGisConnection.js";
+import { PostGisConnection } from "../src/util/PostGisConnection.js";
 
 test("add new job, then remove it", async (t) => {
   const pgconn = new PostGisConnection();
