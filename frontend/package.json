@@ -1,0 +1,13 @@
+{
+  "name": "mapbox-vector-tiles",
+  "dependencies": {
+    "ol": "7.1.0"
+  },
+  "devDependencies": {
+    "vite": "^3.0.3"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  }
+}
