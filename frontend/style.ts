@@ -42,6 +42,7 @@ export function createMapboxStreetsV6Style(): StyleLike {
   const styles: Style[] = [];
 
   return function (feature, resolution) {
+    //console.log(feature);
     let length = 0;
     const layer = feature.get("layer");
     const cls = feature.get("class");
@@ -53,8 +54,10 @@ export function createMapboxStreetsV6Style(): StyleLike {
     const disputed = feature.get("disputed");
     const maki = feature.get("maki");
     const geom = feature.getGeometry()?.getType();
-
-    if (layer == "landuse" && cls == "park") {
+    if (layer == "default") {
+      fill.setColor("#000");
+      styles[length++] = polygon;
+    } else if (layer == "landuse" && cls == "park") {
       fill.setColor("#d8e8c8");
       styles[length++] = polygon;
     } else if (layer == "landuse" && cls == "cemetery") {
