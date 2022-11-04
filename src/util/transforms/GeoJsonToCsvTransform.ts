@@ -26,7 +26,7 @@ export class GeoJsonToCsvTransform extends Transform {
     const featureAsJSON = JSON.parse(line) as GeoFeatureJSON;
     featureAsJSON.colId = this.colId;
 
-    const parsedLine = this.ndJSONtoCSV(featureAsJSON);
+    const parsedLine = this.geoNdJSONtoCSV(featureAsJSON);
     this.push(parsedLine);
     callback();
   }
@@ -39,18 +39,19 @@ export class GeoJsonToCsvTransform extends Transform {
    * @param ndj GeoJSON Feature
    * @returns csv line, newline terminated.
    */
-  private ndJSONtoCSV(ndj: GeoFeatureJSON): string {
+  private geoNdJSONtoCSV(ndj: GeoFeatureJSON): string {
     // build column values for db input
     const col_properties = ndj.properties;
     const col_geom = ndj.geometry;
 
     const csv_properties = JSON.stringify(col_properties).replaceAll('"', '""');
     const csv_geom = JSON.stringify(col_geom).replaceAll('"', '""');
-    const csv_colid = JSON.stringify(ndj.colId);
 
+    const csv_colid = JSON.stringify(ndj.colId);
     const csv_line =
       '"' + csv_geom + '";"' + csv_properties + '";' + csv_colid + "\n";
-    //console.log(csv_line);
+
+    console.log(csv_line);
 
     return csv_line;
   }
