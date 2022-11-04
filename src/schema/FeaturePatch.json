@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://geojson.org/schema/Feature.json",
+  "title": "GeoJSON Feature",
+  "type": "object",
+  "required": ["FeatureId", "properties"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["FeatureId"]
+    },
+    "properties": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { fastify, RequestParamsDefault } from "fastify";
+import { fastify } from "fastify";
 import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
 import closeWithGrace from "close-with-grace";
@@ -10,27 +10,13 @@ import { FastifyRequest } from "fastify";
 import { GeodataUpstreamHandler } from "./util/GeodataUpstreamHandler.js";
 import * as path from "path";
 import { PostGisConnection } from "./util/PostGisConnection.js";
-const pump = promisify(pipeline);
-
 import appLinks from "./data/landingPage.js";
 import conformance from "./data/conformance.js";
-import { REPL_MODE_SLOPPY } from "repl";
+
+const pump = promisify(pipeline);
 
 const pgConn = new PostGisConnection();
 const featureValidator = new GeodataUpstreamHandler(pgConn);
-
-interface RequestParams {
-  featId: string;
-  colId: string;
-  featureId: string;
-}
-
-interface TileQueryParams {
-  collId: string;
-  z: number;
-  x: number;
-  y: number;
-}
 
 // Instantiate Fastify with some config
 const app = fastify({
@@ -105,9 +91,12 @@ app.get("/collections", function (request, reply) {
 });
 
 app.get(
-  "/collections/:colId/items",
+  "/collections/:collId/items",
   {
     schema: {
+      params: Type.Object({
+        collId: Type.String(),
+      }),
       querystring: Type.Object({
         limit: Type.Optional(Type.String()),
         datetime: Type.Optional(Type.String()),
@@ -116,7 +105,7 @@ app.get(
     },
   },
   function (request, reply) {
-    const { colId } = request.params as RequestParams;
+    const { collId } = request.params;
 
     const limit = request.query.limit;
     const datetime = request.query.datetime;
@@ -124,7 +113,7 @@ app.get(
 
     pgConn
       .getFeaturesByCollectionId(
-        colId,
+        collId,
         Number(limit) ? Number(limit) : undefined
       )
       .then((response) => {
@@ -139,28 +128,32 @@ app.get(
 );
 
 // Returns collection info if collection exists, else 404
-app.get("/collections/:colId", function (request, reply) {
-  const { colId } = request.params as RequestParams;
+app.get(
+  "/collections/:collId",
+  {
+    schema: {
+      params: Type.Object({
+        collId: Type.String(),
+      }),
+    },
+  },
+  function (request, reply) {
+    const { collId } = request.params;
 
-  pgConn
-    .getCollectionById(colId)
-    .then((response) => {
-      if (response.length > 0) {
-        reply.code(200).send(response);
-      } else {
-        reply.code(404).send();
-      }
-    })
-    .catch((err) => {
-      reply.code(404).send(err);
-    });
-});
-
-app.get("/newzea", async function (req, reply) {
-  const mvt = await pgConn.mvtDummyData();
-
-  reply.code(200).send(mvt);
-});
+    pgConn
+      .getCollectionById(collId)
+      .then((response) => {
+        if (response.length > 0) {
+          reply.code(200).send(response);
+        } else {
+          reply.code(404).send();
+        }
+      })
+      .catch((err) => {
+        reply.code(404).send(err);
+      });
+  }
+);
 
 app.addHook("onClose", (instance, done) => {
   closeListeners.uninstall();
@@ -168,9 +161,13 @@ app.addHook("onClose", (instance, done) => {
 });
 
 app.get(
-  "/collections/:colId/items/:featId",
+  "/collections/:collId/items/:featId",
   {
     schema: {
+      params: Type.Object({
+        collId: Type.String(),
+        featId: Type.String(),
+      }),
       querystring: Type.Object({
         limit: Type.Optional(Type.String()),
         datetime: Type.Optional(Type.String()),
@@ -179,10 +176,10 @@ app.get(
     },
   },
   function (request, reply) {
-    const { colId, featId } = request.params as RequestParams;
+    const { collId, featId } = request.params;
 
     pgConn
-      .getFeatureByCollectionIdAndFeatureId(colId, featId)
+      .getFeatureByCollectionIdAndFeatureId(collId, featId)
       .then((response) => {
         //const a = JSON.parse(response);
         if (response.length > 0) {
@@ -248,12 +245,47 @@ app.post("/data", async function (req: FastifyRequest, reply) {
   reply.send(jobId);
 });
 
-app.get("/:collId/:z/:x/:y", function (request, reply) {
-  const { collId, z, x, y } = request.params as TileQueryParams;
+app.get(
+  "/collections/:collId/:z/:x/:y",
+  {
+    schema: {
+      params: Type.Object({
+        collId: Type.String(),
+        x: Type.Integer(),
+        y: Type.Integer(),
+        z: Type.Integer(),
+      }),
+    },
+  },
+  function (request, reply) {
+    const { collId, z, x, y } = request.params;
 
-  pgConn.getMVT(collId, z, x, y);
-  reply.send(`Queried ${collId} z:${z} x:${x} y:${y}`);
-});
+    const mvt = pgConn.getMVT(collId, z, x, y);
+    reply.send(mvt);
+  }
+);
+
+app.get(
+  "/collections/:collId/:z/:x/:y.vector.pbf",
+  {
+    schema: {
+      params: Type.Object({
+        collId: Type.String(),
+        x: Type.Integer(),
+        y: Type.Integer(),
+        z: Type.Integer(),
+      }),
+    },
+  },
+  async function (request, reply) {
+    const { collId, z, x, y } = request.params;
+
+    const mvt = await pgConn.getMVT(collId, z, x, y);
+    console.log(mvt);
+    //reply.send(`Queried ${collId} z:${z} x:${x} y:${y}`);
+    reply.send(mvt[0].st_asmvt);
+  }
+);
 /*
 // Insert data into db if not already exists
 app.put("/data", async function name(req, reply) {
@@ -289,7 +321,7 @@ app.put("/data", async function name(req, reply) {
   reply.send(jobId);
 });
 */
-/*
+
 // Insert data into db if already exists
 app.patch("/data", async function name(req, reply) {
   const data = await req.file();
@@ -325,9 +357,13 @@ app.patch("/data", async function name(req, reply) {
 
 // Delete existing data
 app.delete("/data", async function name(req, reply) {
-  //
+  throw Error("Not yet implemented");
 });
 
-*/
+app.get("/newzea", async function (req, reply) {
+  const mvt = await pgConn.mvtDummyData();
+
+  reply.code(200).send(mvt);
+});
 
 export { app };
