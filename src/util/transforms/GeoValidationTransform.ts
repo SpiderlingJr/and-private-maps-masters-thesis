@@ -4,18 +4,28 @@ import { Transform, TransformCallback } from "stream";
 import * as path from "path";
 import { readFileSync } from "fs";
 
+type Schema = "GeoValidation" | "PatchValidation";
+
 const featureSchemaPath = path.join(process.cwd(), "src/schema/Feature.json");
+
+const patchSchemaPath = path.join(
+  process.cwd(),
+  "src/schema/FeaturePatch.json"
+);
 
 export class GeoValidationTransform extends Transform {
   ajv: Ajv;
   featureSchema: JSON;
   validate;
 
-  constructor(options: TransformOptions = {}) {
+  constructor(
+    options: TransformOptions = {},
+    schema: Schema = "GeoValidation"
+  ) {
     super({ ...options });
 
     this.ajv = new Ajv();
-    this.featureSchema = this.loadFeatureSchema();
+    this.featureSchema = this.loadFeatureSchema(schema);
     this.validate = this.ajv.compile(this.featureSchema);
   }
 
@@ -24,7 +34,15 @@ export class GeoValidationTransform extends Transform {
    * @param file Path to geojson feature schema
    * @returns JSON obj schema
    */
-  private loadFeatureSchema(file: string = featureSchemaPath): JSON {
+  private loadFeatureSchema(schema: Schema): JSON {
+    let file;
+    switch (schema) {
+      case "GeoValidation":
+        file = featureSchemaPath;
+        break;
+      case "PatchValidation":
+        file = patchSchemaPath;
+    }
     const fileData = readFileSync(file, "utf-8");
     return JSON.parse(fileData);
   }
