@@ -1,5 +1,5 @@
 import { createReadStream } from "fs";
-import { Features } from "src/entities/features.js";
+import { TmpFeatures, Features } from "src/entities/features.js";
 import { Collections } from "src/entities/collections.js";
 import { Jobs, JobState } from "src/entities/jobs.js";
 import { DataSource } from "typeorm";
@@ -8,8 +8,10 @@ import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner
 import pgcopy from "pg-copy-streams";
 import { pipeline } from "stream/promises";
 
+const features_db = "features_test";
+
 export class PostGisConnection {
-  conn: DataSource; // = null <--
+  conn: DataSource;
   connPromise: Promise<DataSource>;
 
   async connectDB(): Promise<DataSource> {
@@ -21,7 +23,7 @@ export class PostGisConnection {
         username: process.env.PG_USER,
         password: process.env.PG_PW,
         database: process.env.PG_DB,
-        entities: [Features, Collections, Jobs],
+        entities: [Features, Collections, Jobs, TmpFeatures],
         synchronize: true,
       });
 
@@ -114,23 +116,67 @@ export class PostGisConnection {
     }
   }
 
-  // TODO make this PATCH
-  async pgCopyPatch(file: string) {
+  async pgPatch(file: string) {
+    try {
+      const queryRunner = this.conn.createQueryRunner();
+      const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
+
+      await queryRunner.startTransaction();
+      try {
+        await queryRunner.clearTable("tmp_features");
+        await pipeline(
+          createReadStream(file),
+          pgConn.query(
+            pgcopy.from(
+              `COPY tmp_features(feature_id, properties, geom) FROM STDIN (FORMAT CSV, DELIMITER ';')`
+            )
+          )
+        );
+        const updatableRows = await queryRunner.manager.count("tmp_features");
+
+        const resp = await pgConn.query(
+          `UPDATE features_test
+            SET properties = features_test.properties || tmp_features.properties
+            FROM tmp_features
+            WHERE features_test.feature_id = tmp_features.feature_id;`
+        );
+        const updatedRows = Number(resp.rowCount);
+
+        if (updatableRows != updatedRows)
+          throw new Error(
+            "Tried to patch a feature that did not exist in features!"
+          );
+
+        await queryRunner.commitTransaction();
+      } catch (err) {
+        await queryRunner.rollbackTransaction();
+        throw err;
+      } finally {
+        await queryRunner.release();
+      }
+    } catch (err) {
+      throw new Error("Error in pgPatch:\n" + err);
+    }
+  }
+  /**
+   *
+   * @param featId uuid of feature to be patched
+   * @param feature
+   * @throws NotFoundError if feature with featId doesnt exist in db
+   */
+  async patchFeature(featId: string, feature: object) {
     await this.initialized();
 
-    const queryRunner = this.conn.createQueryRunner();
-    const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
-    await pipeline(
-      createReadStream(file),
-      pgConn.query(
-        pgcopy.from(
-          "COPY features_test(geom, properties) FROM STDIN (FORMAT CSV, DELIMITER ';')"
-        )
-      )
-    );
+    // upload into temporary table
+    // merge into fids
+    const patch_tmpl = `
+    UPDATE ${features_db}
+      SET properties = '${feature}'::jsonb || properties
+      WHERE feature_id = ${featId}`;
+    const response = Features.query(patch_tmpl);
+    console.log(JSON.stringify(response));
   }
 
-  // TODO ake this PUT
   async pgCopyPut(file: string) {
     await this.initialized();
 
@@ -140,7 +186,7 @@ export class PostGisConnection {
       createReadStream(file),
       pgConn.query(
         pgcopy.from(
-          "COPY features_test(geom, properties) FROM STDIN (FORMAT CSV, DELIMITER ';')"
+          `COPY ${features_db} (geom, properties) FROM STDIN (FORMAT CSV, DELIMITER ';')`
         )
       )
     );
@@ -160,6 +206,7 @@ export class PostGisConnection {
 
     return coll;
   }
+
   async getFeaturesByCollectionId(colId: string, limit?: number) {
     await this.initialized();
 
@@ -184,11 +231,9 @@ export class PostGisConnection {
     return feat;
   }
 
-  // FOR TESTING ----------
   async countJobs() {
     await this.initialized();
 
-    // = this.conn.manager.find(Jobs);
     return Jobs.count();
   }
 
@@ -230,13 +275,15 @@ export class PostGisConnection {
 
     const buffer_fp = buffer * 1.0;
     const feature_table = "features_test";
-    const mvt_tmpl = `WITH mvtgeom AS ( \
-    SELECT ST_AsMVTGeom(geom, ST_TileEnvelope(${z},${x},${y}, extent => ${extent},  buffer => ${buffer}) AS geom, properties \
+
+    const mvt_tmpl = `WITH mvtgeom AS (\
+    SELECT ST_AsMVTGeom(geom, ST_TileEnvelope(${z},${x},${y}), extent => ${extent},  buffer => ${buffer}) AS geom, properties \
       FROM ${feature_table} \
       WHERE geom && ST_TileEnvelope(${z},${x},${y}, margin=> (${buffer_fp}/${extent}))) \
     SELECT ST_AsMVT(mvtgeom.*, '${name}') FROM mvtgeom;`;
 
     const mvt_resp = Features.query(mvt_tmpl);
+
     return mvt_resp;
   }
 }

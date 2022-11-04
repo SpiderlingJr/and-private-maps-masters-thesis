@@ -25,3 +25,15 @@ export class Features extends BaseEntity {
   @Column({ type: "jsonb", nullable: true })
   properties: string;
 }
+
+@Entity("tmp_features")
+export class TmpFeatures extends BaseEntity {
+  @PrimaryGeneratedColumn("uuid")
+  feature_id: string;
+
+  @Column({ type: "geometry", nullable: true })
+  geom: Geometry;
+
+  @Column({ type: "jsonb", nullable: true })
+  properties: string;
+}
