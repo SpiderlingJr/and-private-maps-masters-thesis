@@ -231,6 +231,24 @@ export class PostGisConnection {
     return feat;
   }
 
+  /**
+   * Requests minZoom and maxZoom of a collection
+   * @param collId id of requested collection
+   * @returns
+   */
+  async getCollectionZoomLevel(
+    collId: string
+  ): Promise<{ minZoom: number; maxZoom: number }> {
+    await this.initialized();
+
+    const collection = (await this.getCollectionById(collId))[0];
+    console.log(collection);
+    const minZoom = collection.min_zoom;
+    const maxZoom = collection.max_zoom;
+
+    return { minZoom: minZoom, maxZoom: maxZoom };
+  }
+
   async countJobs() {
     await this.initialized();
 

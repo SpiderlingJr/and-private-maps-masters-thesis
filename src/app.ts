@@ -15,6 +15,7 @@ import conformance from "./data/conformance.js";
 
 const pump = promisify(pipeline);
 
+const mvtCache = new Map();
 const pgConn = new PostGisConnection();
 const featureValidator = new GeodataUpstreamHandler(pgConn);
 
@@ -280,10 +281,19 @@ app.get(
   async function (request, reply) {
     const { collId, z, x, y } = request.params;
 
-    const mvt = await pgConn.getMVT(collId, z, x, y);
-    console.log(mvt);
-    //reply.send(`Queried ${collId} z:${z} x:${x} y:${y}`);
-    reply.send(mvt[0].st_asmvt);
+    console.log("happy?");
+    // TODO get minzoom / maxzoom of requested collection
+    const { minZoom, maxZoom } = await pgConn.getCollectionZoomLevel(collId);
+
+    if (minZoom <= z && z <= maxZoom) {
+      const mvt = await pgConn.getMVT(collId, z, x, y);
+      console.log(mvt);
+      reply.send(mvt[0].st_asmvt);
+    } else {
+      //console.log("z out of min/maxzoom bounds, return empty");
+      //const emptyMvt = await pgConn.emptyMVT();
+      reply.send(200);
+    }
   }
 );
 /*
