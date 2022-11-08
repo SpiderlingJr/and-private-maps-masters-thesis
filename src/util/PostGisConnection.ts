@@ -312,11 +312,15 @@ export class PostGisConnection {
 
     const { minZoom, maxZoom } = style as typeof styleSchema;
 
-    await Collections.createQueryBuilder()
+    const res = await Collections.createQueryBuilder()
       .update()
       .set({ min_zoom: minZoom, max_zoom: maxZoom })
       .where("coll_id = :cid", { cid: collId })
       .execute();
+
+    if (res.affected == 0) {
+      throw new Error("No such collection");
+    }
     // TODO might be handled more generally later. for now, only maxZoom and minZoom are of updated
   }
 }

@@ -148,7 +148,11 @@ app.get(
         if (response.length > 0) {
           reply.code(200).send(response);
         } else {
-          reply.code(404).send();
+          reply.code(404).send({
+            statusCode: 404,
+            error: "Not Found",
+            message: "No such collection",
+          });
         }
       })
       .catch((err) => {
@@ -263,14 +267,14 @@ app.post(
     const { minZoom, maxZoom } = request.body.Style;
 
     if (minZoom > maxZoom) {
-      reply.code(400).send("minZoom cannot be greater than maxZoom");
+      reply.code(400).send({ error: "minZoom cannot be greater than maxZoom" });
       return;
     }
     try {
       await pgConn.setStyle(collId, request.body.Style);
       reply.code(200).send();
     } catch (e) {
-      reply.code(500).send(e);
+      reply.code(404).send(e);
     }
   }
 );
@@ -321,8 +325,10 @@ app.get(
     }
   }
 );
+
 /*
 // Insert data into db if not already exists
+// Todo implement put
 app.put("/data", async function name(req, reply) {
   const data = await req.file();
 
