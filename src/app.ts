@@ -306,22 +306,20 @@ app.get(
     // TODO get minzoom / maxzoom of requested collection
     const { minZoom, maxZoom } = await pgConn.getCollectionZoomLevel(collId);
 
-    if (minZoom <= z && z <= maxZoom) {
-      // Is MVT already in cache?
-      let mvt = mvtCache.get(`${z}/${x}/${y}`);
-      if (mvt) {
-        console.log(`we have mvt ${z}/${x}/${y} at home`);
-        reply.send(mvt[0].st_asmvt);
-      } else {
-        // Not already cached, request and cache.
-
-        console.log(`thats new! ${z}/${x}/${y} `);
-        mvt = await pgConn.getMVT(collId, z, x, y);
-        mvtCache.set(`${z}/${x}/${y}`, mvt);
-        reply.send(mvt[0].st_asmvt);
-      }
-    } else {
+    // return nothing if z is out of bounds for zoom levels
+    if (!(minZoom <= z && z <= maxZoom)) {
       reply.send(200);
+    }
+    // Is MVT already in cache?
+    let mvt = mvtCache.get(`${z}/${x}/${y}`);
+
+    if (mvt) {
+      reply.send(mvt[0].st_asmvt);
+    } else {
+      // Not already cached, request and cache.
+      mvt = await pgConn.getMVT(collId, z, x, y);
+      mvtCache.set(`${z}/${x}/${y}`, mvt);
+      reply.send(mvt[0].st_asmvt);
     }
   }
 );
