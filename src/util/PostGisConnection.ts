@@ -8,6 +8,8 @@ import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner
 import pgcopy from "pg-copy-streams";
 import { pipeline } from "stream/promises";
 
+import { styleSchema } from "../schema/httpRequestSchemas.js";
+
 const features_db = "features_test";
 
 export class PostGisConnection {
@@ -303,5 +305,18 @@ export class PostGisConnection {
     const mvt_resp = Features.query(mvt_tmpl);
 
     return mvt_resp;
+  }
+
+  async setStyle(collId: string, style: object) {
+    await this.initialized();
+
+    const { minZoom, maxZoom } = style as typeof styleSchema;
+
+    await Collections.createQueryBuilder()
+      .update()
+      .set({ min_zoom: minZoom, max_zoom: maxZoom })
+      .where("coll_id = :cid", { cid: collId })
+      .execute();
+    // TODO might be handled more generally later. for now, only maxZoom and minZoom are of updated
   }
 }

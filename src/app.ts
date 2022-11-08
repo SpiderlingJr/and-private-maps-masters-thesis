@@ -12,6 +12,12 @@ import * as path from "path";
 import { PostGisConnection } from "./util/PostGisConnection.js";
 import appLinks from "./data/landingPage.js";
 import conformance from "./data/conformance.js";
+import {
+  styleSchema,
+  collIdSchema,
+  collIdZXYSchema,
+  getCollectionOptionsSchema,
+} from "./schema/httpRequestSchemas.js";
 
 const pump = promisify(pipeline);
 
@@ -97,20 +103,15 @@ app.get(
   "/collections/:collId/items",
   {
     schema: {
-      params: Type.Object({
-        collId: Type.String(),
-      }),
-      querystring: Type.Object({
-        limit: Type.Optional(Type.String()),
-        datetime: Type.Optional(Type.String()),
-        bbox: Type.Optional(Type.String()),
-      }),
+      params: collIdSchema,
+      querystring: getCollectionOptionsSchema,
     },
   },
   function (request, reply) {
     const { collId } = request.params;
 
     const limit = request.query.limit;
+    // TODO use those
     const datetime = request.query.datetime;
     const bbox = request.query.bbox;
 
@@ -135,9 +136,7 @@ app.get(
   "/collections/:collId",
   {
     schema: {
-      params: Type.Object({
-        collId: Type.String(),
-      }),
+      params: collIdSchema,
     },
   },
   function (request, reply) {
@@ -248,16 +247,38 @@ app.post("/data", async function (req: FastifyRequest, reply) {
   reply.send(jobId);
 });
 
+/**
+ * Allows posting a Style JSON-Object
+ */
+app.post(
+  "/collections/:collId/style",
+  {
+    schema: {
+      params: collIdSchema,
+      body: styleSchema,
+    },
+  },
+  async function (request, reply) {
+    const { collId } = request.params;
+    const { minZoom, maxZoom } = request.body.Style;
+
+    if (minZoom > maxZoom) {
+      reply.code(400).send("minZoom cannot be greater than maxZoom");
+      return;
+    }
+    try {
+      await pgConn.setStyle(collId, request.body.Style);
+      reply.code(200).send();
+    } catch (e) {
+      reply.code(500).send(e);
+    }
+  }
+);
 app.get(
   "/collections/:collId/:z/:x/:y",
   {
     schema: {
-      params: Type.Object({
-        collId: Type.String(),
-        x: Type.Integer(),
-        y: Type.Integer(),
-        z: Type.Integer(),
-      }),
+      params: collIdZXYSchema,
     },
   },
   function (request, reply) {
@@ -272,12 +293,7 @@ app.get(
   "/collections/:collId/:z/:x/:y.vector.pbf",
   {
     schema: {
-      params: Type.Object({
-        collId: Type.String(),
-        x: Type.Integer(),
-        y: Type.Integer(),
-        z: Type.Integer(),
-      }),
+      params: collIdZXYSchema,
     },
   },
   async function (request, reply) {
