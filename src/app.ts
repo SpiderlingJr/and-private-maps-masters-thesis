@@ -55,6 +55,21 @@ app.register(fastifyMultipart, {
   },
 });
 
+const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
+  if (err) {
+    app.log.error(err);
+  }
+  await app.close();
+};
+
+// delay is the number of milliseconds for the graceful close to finish
+const closeListeners = closeWithGrace(
+  {
+    delay: parseInt(process.env.FASTIFY_CLOSE_GRACE_DELAY || "") || 500,
+  },
+  handler
+);
+
 // Landing Page
 app.get("/", function (request, reply) {
   const response = {
@@ -70,21 +85,6 @@ app.get("/", function (request, reply) {
 app.get("/conformance", function (request, reply) {
   reply.send(conformance);
 });
-
-const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
-  if (err) {
-    app.log.error(err);
-  }
-  await app.close();
-};
-
-// delay is the number of milliseconds for the graceful close to finish
-const closeListeners = closeWithGrace(
-  {
-    delay: parseInt(process.env.FASTIFY_CLOSE_GRACE_DELAY || "") || 500,
-  },
-  handler
-);
 
 app.get("/collections", function (request, reply) {
   pgConn
@@ -272,6 +272,7 @@ app.post(
     }
     try {
       await pgConn.setStyle(collId, request.body.Style);
+      mvtCache.clear();
       reply.code(200).send();
     } catch (e) {
       reply.code(404).send(e);
@@ -293,6 +294,10 @@ app.get(
   }
 );
 
+/**
+ * Requests the geometry and property data of a given collection, and returns a VMT protobuf object
+ * containing the feature data of requested zoom levels and x/y coordinates.
+ */
 app.get(
   "/collections/:collId/:z/:x/:y.vector.pbf",
   {
@@ -306,9 +311,12 @@ app.get(
     // TODO get minzoom / maxzoom of requested collection
     const { minZoom, maxZoom } = await pgConn.getCollectionZoomLevel(collId);
 
+    console.log(minZoom, maxZoom);
     // return nothing if z is out of bounds for zoom levels
     if (!(minZoom <= z && z <= maxZoom)) {
+      console.log("Out of bounds");
       reply.send(200);
+      return;
     }
     // Is MVT already in cache?
     let mvt = mvtCache.get(`${z}/${x}/${y}`);
@@ -324,6 +332,30 @@ app.get(
   }
 );
 
+// For testing the cache
+app.get(
+  "/cache/:z/:x/:y",
+  {
+    schema: {
+      params: Type.Object({
+        x: Type.Integer(),
+        y: Type.Integer(),
+        z: Type.Integer(),
+      }),
+    },
+  },
+  async function (request, reply) {
+    const { z, x, y } = request.params;
+
+    const mvt = mvtCache.get(`${z}/${x}/${y}`);
+
+    if (mvt) {
+      reply.code(200).send(mvt[0].st_asmvt);
+    } else {
+      reply.code(404);
+    }
+  }
+);
 /*
 // Insert data into db if not already exists
 // Todo implement put
