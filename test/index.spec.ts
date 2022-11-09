@@ -1,6 +1,34 @@
 import { test } from "tap";
 import { app } from "../src/app.js";
+import FormData from "form-data";
+import { createReadStream } from "fs";
+// TODO inject some test data for each manipulation
+// TODO test-collection for each test case / sequence
 
+//TODO
+test("standard workflow", async (t) => {
+  // TODO upload a valid ndjson file
+  const form = new FormData();
+  form.append("valid_data", createReadStream(`test/data/valid_ndjson.ndjson`));
+
+  const uploadResponse = await app.inject({
+    method: "POST",
+    url: "/data",
+    payload: form,
+    headers: form.getHeaders(),
+  });
+
+  t.equal(uploadResponse.statusCode, 200);
+
+  // TODO get collection id of uploaded file
+  const jid = uploadResponse.body;
+  console.log("Jid", jid);
+  // TODO try to get data for that collection
+  // TODO try setting a style
+  // TODO try receiving data out of bounds of style
+  // TODO try receivin data in bounds of style
+  // TODO try deleting the collection
+});
 test('requests the "/randomRoute" route', async (t) => {
   const response = await app.inject({
     method: "GET",
@@ -170,4 +198,35 @@ test("try setting a minZoom level exceeding 22 (maximum mvt depth)", async (t) =
     error: "Bad Request",
     message: "body/Style/minZoom must be <= 22",
   });
+});
+
+// Cache tests
+test("test if requested pbfs are properly stored in cache", async (t) => {
+  // Request any tile
+  const pbf_request =
+    "/collections/7555e516-9a11-445b-b614-f12c1185ed62/3/3/2.vector.pbf";
+  const cache_request = "/cache/3/3/2";
+
+  // assert cache doesnt have an entry at that position on loadup
+  const cachePreRequest = await app.inject({
+    method: "GET",
+    url: cache_request,
+  });
+  t.equal(cachePreRequest.statusCode, 404);
+
+  const response = await app.inject({
+    method: "GET",
+    url: pbf_request,
+  });
+
+  const cachePostRequest = await app.inject({
+    method: "GET",
+    url: cache_request,
+  });
+  t.equal(cachePostRequest.statusCode, 200);
+  t.equal(cachePostRequest.body, response.body);
+});
+
+test("cache is invalidated after a style post", async (t) => {
+  //
 });
