@@ -17,7 +17,9 @@ import {
   collIdSchema,
   collIdZXYSchema,
   getCollectionOptionsSchema,
+  jobIdSchema,
 } from "./schema/httpRequestSchemas.js";
+import { JobState } from "./entities/jobs.js";
 
 const pump = promisify(pipeline);
 
@@ -85,6 +87,20 @@ app.get("/", function (request, reply) {
 app.get("/conformance", function (request, reply) {
   reply.send(conformance);
 });
+
+app.get(
+  "/job/:jobId",
+  {
+    schema: { params: jobIdSchema },
+  },
+  async function (request, reply) {
+    const { jobId } = request.params;
+
+    const jobResponse = (await pgConn.getJobById(jobId))[0];
+
+    reply.send(jobResponse);
+  }
+);
 
 app.get("/collections", function (request, reply) {
   pgConn
@@ -248,7 +264,7 @@ app.post("/data", async function (req: FastifyRequest, reply) {
     featureValidator.validateAndUploadGeoFeature(tmpStorage, jobId);
   });
 
-  reply.send(jobId);
+  reply.code(200).send(jobId);
 });
 
 /**
@@ -290,7 +306,7 @@ app.get(
     const { collId, z, x, y } = request.params;
 
     const mvt = pgConn.getMVT(collId, z, x, y);
-    reply.send(mvt);
+    reply.code(200).send(mvt);
   }
 );
 
@@ -315,7 +331,7 @@ app.get(
     // return nothing if z is out of bounds for zoom levels
     if (!(minZoom <= z && z <= maxZoom)) {
       console.log("Out of bounds");
-      reply.send(200);
+      reply.code(200).send();
       return;
     }
     // Is MVT already in cache?
@@ -325,8 +341,11 @@ app.get(
       reply.send(mvt[0].st_asmvt);
     } else {
       // Not already cached, request and cache.
+      console.log("NOT IN CACHE");
       mvt = await pgConn.getMVT(collId, z, x, y);
+      console.log("mvt", mvt);
       mvtCache.set(`${z}/${x}/${y}`, mvt);
+
       reply.send(mvt[0].st_asmvt);
     }
   }
@@ -427,9 +446,38 @@ app.patch("/data", async function name(req, reply) {
 });
 
 // Delete existing data
-app.delete("/data", async function name(req, reply) {
-  throw Error("Not yet implemented");
-});
+app.delete(
+  "/collections/:collId",
+  {
+    schema: {
+      params: collIdSchema,
+    },
+  },
+  async function name(req, reply) {
+    const { collId } = req.params;
+
+    const jobId = await pgConn.createNewJob();
+    const delResponse = await pgConn
+      .deleteCollection(collId, jobId)
+      .then(async (response) => {
+        const jobResponse = await pgConn.updateJob(
+          jobId,
+          JobState.FINISHED,
+          collId
+        );
+      })
+      .catch(async (err) => {
+        const jobResponse = await pgConn.updateJob(
+          jobId,
+          JobState.ERROR,
+          collId,
+          err
+        );
+      });
+
+    reply.send(jobId);
+  }
+);
 
 app.get("/newzea", async function (req, reply) {
   const mvt = await pgConn.mvtDummyData();
