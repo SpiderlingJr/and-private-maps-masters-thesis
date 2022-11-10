@@ -77,7 +77,7 @@ export class GeodataUpstreamHandler {
         this.postgis
           .pgPatch(tmpCsvStorage)
           .then(() => {
-            this.postgis.updateJob(jobId, JobState.FINISHED);
+            this.postgis.updateJob(jobId, JobState.FINISHED, colId);
             //this.removeFile(tmpCsvStorage);
           })
           .catch((err) => {
@@ -91,7 +91,7 @@ export class GeodataUpstreamHandler {
       })
       // Any errors mark the job as failed, no upload happens.
       .catch((err) => {
-        this.postgis.updateJob(jobId, JobState.ERROR);
+        this.postgis.updateJob(jobId, JobState.ERROR, colId, err);
         throw new Error(err);
         //console.error("Error during upload? ", err);
       })
@@ -153,13 +153,14 @@ export class GeodataUpstreamHandler {
         this.postgis
           .pgCopyInsert(tmpCsvStorage)
           .then(() => {
-            this.postgis.updateJob(jobId, JobState.FINISHED);
+            this.postgis.updateJob(jobId, JobState.FINISHED, colId);
             this.removeFile(tmpCsvStorage);
           })
           .catch((err) => {
             this.postgis.updateJob(
               jobId,
               JobState.ERROR,
+              colId,
               "Could not copy stream to db after validation"
             );
             throw new Error(err);
@@ -167,7 +168,7 @@ export class GeodataUpstreamHandler {
       })
       // Any errors mark the job as failed, no upload happens.
       .catch((err) => {
-        this.postgis.updateJob(jobId, JobState.ERROR);
+        this.postgis.updateJob(jobId, JobState.ERROR, colId);
         throw new Error(err);
         //console.error("Error during upload? ", err);
       })

@@ -73,7 +73,12 @@ export class PostGisConnection {
     return ["pending", "finished", "error"].includes(value);
   }
 
-  async updateJob(jobId: string, state: JobState, note?: string) {
+  async updateJob(
+    jobId: string,
+    state: JobState,
+    colId: string | undefined,
+    note?: string
+  ) {
     await this.initialized();
 
     if (!this.isJobState(state)) {
@@ -82,7 +87,7 @@ export class PostGisConnection {
     await this.conn
       .createQueryBuilder()
       .update(Jobs)
-      .set({ job_state: state, job_note: note })
+      .set({ job_state: state, job_note: note, job_collection: colId })
       .where("job_id = :id", { id: jobId })
       .execute();
   }
@@ -243,10 +248,10 @@ export class PostGisConnection {
   ): Promise<{ minZoom: number; maxZoom: number }> {
     await this.initialized();
 
-    const collection = (await this.getCollectionById(collId))[0];
-    console.log(collection);
-    const minZoom = collection.min_zoom;
-    const maxZoom = collection.max_zoom;
+    const collection = await this.getCollectionById(collId);
+    console.log("collection?", collection);
+    const minZoom = collection[0].min_zoom;
+    const maxZoom = collection[0].max_zoom;
 
     return { minZoom: minZoom, maxZoom: maxZoom };
   }
@@ -254,17 +259,36 @@ export class PostGisConnection {
   async countJobs() {
     await this.initialized();
 
-    return Jobs.count();
+    return await Jobs.count();
   }
 
   async countFeatures() {
     await this.initialized();
 
-    return Features.count();
+    return await Features.count();
+  }
+
+  async deleteCollection(colId: string, jobId: string) {
+    await this.initialized();
+
+    const deleteResponse = await Collections.createQueryBuilder()
+      .delete()
+      .where("coll_id =:id", { id: colId })
+      .execute();
+
+    console.log(deleteResponse);
   }
 
   async close() {
     await this.conn.destroy();
+  }
+
+  async getJobById(jobId: string) {
+    await this.initialized();
+
+    const jobData = await Jobs.find({ where: { job_id: jobId } });
+
+    return jobData;
   }
 
   async mvtDummyData() {
@@ -302,7 +326,7 @@ export class PostGisConnection {
       WHERE geom && ST_TileEnvelope(${z},${x},${y}, margin=> (${buffer_fp}/${extent}))) \
     SELECT ST_AsMVT(mvtgeom.*, '${name}') FROM mvtgeom;`;
 
-    const mvt_resp = Features.query(mvt_tmpl);
+    const mvt_resp = await Features.query(mvt_tmpl);
 
     return mvt_resp;
   }

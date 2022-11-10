@@ -4,7 +4,10 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from "typeorm";
+import { Collections } from "./collections";
 
 export enum JobState {
   PENDING = "pending",
@@ -23,6 +26,9 @@ export class Jobs extends BaseEntity {
     default: JobState.PENDING,
   })
   job_state: JobState;
+
+  @Column({ type: "varchar", length: 512, nullable: true })
+  job_collection: Collections;
 
   @Column({ type: "varchar", length: 512, nullable: true })
   job_note: string;

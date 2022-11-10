@@ -15,7 +15,7 @@ export class Features extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   feature_id: string;
 
-  @ManyToOne((type) => Collections)
+  @ManyToOne((type) => Collections, { onDelete: "CASCADE" })
   @JoinColumn({ name: "ft_collection" })
   ft_collection: Collections;
 
