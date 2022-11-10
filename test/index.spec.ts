@@ -4,61 +4,24 @@ import FormData from "form-data";
 import { createReadStream } from "fs";
 import { styleSchema } from "../src/schema/httpRequestSchemas.js";
 import { JobState } from "../src/entities/jobs.js";
-import LightMyRequest from "light-my-request";
+
 import { PostGisConnection } from "../src/util/PostGisConnection.js";
+import { waitForUploadJobCompletion } from "./test_util/injects.js";
 // TODO inject some test data for each manipulation
 // TODO test-collection for each test case / sequence
 
 //TODO
-test("suite", async (t) => {
+test("general suite", async (t) => {
   t.teardown(process.exit);
+
   t.test("sub1: standard workflow", async (sub1) => {
     sub1.plan(6);
 
-    async function waitForUploadJobCompletion(
-      jobId: string
-    ): Promise<LightMyRequest.Response> {
-      function delay(time) {
-        return new Promise((resolve) => setTimeout(resolve, time));
-      }
-      sub1;
-      async function getJobState() {
-        const jobResponse = await app.inject({
-          method: "GET",
-          url: `/job/${jobId}`,
-        });
-        if (JSON.parse(jobResponse.body).job_state === JobState.PENDING)
-          throw new Error("PENDING");
-        return jobResponse;
-      }
-      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-      const retryOperation = (operation, delay, retries) =>
-        new Promise((resolve, reject) => {
-          return operation()
-            .then(resolve)
-            .catch((reason) => {
-              if (retries > 0) {
-                return wait(delay)
-                  .then(retryOperation.bind(null, operation, retries - 1))
-                  .then(resolve)
-                  .catch(reject);
-              }
-              return reject(reason);
-            });
-        });
-
-      const jobResponse = retryOperation(
-        getJobState,
-        1000,
-        5
-      ) as Promise<LightMyRequest.Response>;
-      return jobResponse;
-    }
     // upload a valid ndjson file
     const form = new FormData();
     form.append(
       "valid_data",
-      createReadStream(`test/data/valid_ndjson.ndjson`)
+      createReadStream(`test/data/valid_ndjson_1.ndjson`)
     );
 
     const uploadResponse = await app.inject({
@@ -253,79 +216,109 @@ test("suite", async (t) => {
       }
     );
   });
-  /*
-  t.test("sub4: caching tests", async(sub4) => {
-    test("try setting a minZoom level bigger than maxZoom on an existing collection", async (t) => {
-      const response = await app.inject({
-        method: "POST",
-        url: "/collections/7555e416-9a11-445b-b614-f12c1185ed63/style",
-        headers: {
-          "content-type": "application/json",
-        },
-        payload: {
-          Style: {
-            minZoom: 12,
-            maxZoom: 4,
-          },
-        },
-      });
-      t.equal(response.statusCode, 400);
-      t.same(JSON.parse(response.body), {
-        error: "minZoom cannot be greater than maxZoom",
-      });
+
+  t.test("sub4: caching tests", async (sub4) => {
+    // upload a valid ndjson file
+    const form = new FormData();
+    form.append(
+      "valid_data",
+      createReadStream(`test/data/valid_ndjson_2.ndjson`)
+    );
+
+    const uploadResponse = await app.inject({
+      method: "POST",
+      url: "/data",
+      payload: form,
+      headers: form.getHeaders(),
     });
-  
-    test("try setting a minZoom level exceeding 22 (maximum mvt depth)", async (t) => {
-      const response = await app.inject({
-        method: "POST",
-        url: "/collections/7555e416-9a11-445b-b614-f12c1185ed63/style",
-        headers: {
-          "content-type": "application/json",
-        },
-        payload: {
-          Style: {
-            minZoom: 24,
-            maxZoom: 4,
+    sub4.equal(uploadResponse.statusCode, 200);
+
+    // get collection id of uploaded file, wait for completion if necessary
+    const jobId = uploadResponse.body;
+    const jobResponse = await waitForUploadJobCompletion(jobId);
+    const cid = JSON.parse(jobResponse.body).job_collection;
+
+    sub4.test(
+      "try setting a minZoom level bigger than maxZoom on an existing collection",
+      async (t) => {
+        const response = await app.inject({
+          method: "POST",
+          url: `/collections/${cid}/style`,
+          headers: {
+            "content-type": "application/json",
           },
-        },
-      });
-      t.equal(response.statusCode, 400);
-      t.same(JSON.parse(response.body), {
-        statusCode: 400,
-        error: "Bad Request",
-        message: "body/Style/minZoom must be <= 22",
-      });
-    });
-  
+          payload: {
+            Style: {
+              minZoom: 12,
+              maxZoom: 4,
+            },
+          },
+        });
+        t.equal(response.statusCode, 400);
+        t.same(JSON.parse(response.body), {
+          error: "minZoom cannot be greater than maxZoom",
+        });
+      }
+    );
+
+    sub4.test(
+      "try setting a minZoom level exceeding 22 (maximum mvt depth)",
+      async (t) => {
+        const response = await app.inject({
+          method: "POST",
+          url: `/collections/${cid}/style`,
+          headers: {
+            "content-type": "application/json",
+          },
+          payload: {
+            Style: {
+              minZoom: 24,
+              maxZoom: 4,
+            },
+          },
+        });
+        t.equal(response.statusCode, 400);
+        t.same(JSON.parse(response.body), {
+          statusCode: 400,
+          error: "Bad Request",
+          message: "body/Style/minZoom must be <= 22",
+        });
+      }
+    );
+
     // Cache tests
-    test("test if requested pbfs are properly stored in cache", async (t) => {
-      // Request any tile
-      const pbf_request =
-        "/collections/7555e516-9a11-445b-b614-f12c1185ed62/3/3/2.vector.pbf";
-      const cache_request = "/cache/3/3/2";
-  
-      // assert cache doesnt have an entry at that position on loadup
-      const cachePreRequest = await app.inject({
-        method: "GET",
-        url: cache_request,
-      });
-      t.equal(cachePreRequest.statusCode, 404);
-  
-      const response = await app.inject({
-        method: "GET",
-        url: pbf_request,
-      });
-  
-      const cachePostRequest = await app.inject({
-        method: "GET",
-        url: cache_request,
-      });
-      t.equal(cachePostRequest.statusCode, 200);
-      t.equal(cachePostRequest.body, response.body);
+    sub4.test(
+      "test if requested pbfs are properly stored in cache",
+      async (t) => {
+        // Request any tile
+        const pbf_request = `/collections/${cid}/3/3/2.vector.pbf`;
+        const cache_request = "/cache/3/3/2";
+
+        // assert cache doesnt have an entry at that position on loadup
+        const cachePreRequest = await app.inject({
+          method: "GET",
+          url: cache_request,
+        });
+        t.equal(cachePreRequest.statusCode, 404);
+
+        const response = await app.inject({
+          method: "GET",
+          url: pbf_request,
+        });
+
+        const cachePostRequest = await app.inject({
+          method: "GET",
+          url: cache_request,
+        });
+        t.equal(cachePostRequest.statusCode, 200);
+        t.equal(cachePostRequest.body, response.body);
+      }
+    );
+
+    sub4.todo("cache is invalidated after a style post", async (t) => {
+      // TODO this (I promise it works)
     });
-  
-    test("cache is invalidated after a style post", async (t) => {
-      //
-    });
-  })*/
+
+    sub4.todo("delete collection after sub4 is done");
+  });
 });
