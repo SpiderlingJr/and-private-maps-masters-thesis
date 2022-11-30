@@ -21,10 +21,10 @@ export class PostGisConnection {
       this.conn = new DataSource({
         type: "postgres",
         host: "localhost",
-        port: Number(process.env.PG_PORT),
-        username: process.env.PG_USER,
-        password: process.env.PG_PW,
-        database: process.env.PG_DB,
+        port: Number(process.env.POSTGRES_EXPOSE),
+        username: process.env.POSTGRES_USER,
+        password: process.env.POSTGRES_PASSWORD,
+        database: process.env.POSTGRES_DB,
         entities: [Features, Collections, Jobs, TmpFeatures],
         synchronize: true,
       });
@@ -249,7 +249,6 @@ export class PostGisConnection {
     await this.initialized();
 
     const collection = await this.getCollectionById(collId);
-    console.log("collection?", collection);
     const minZoom = collection[0].min_zoom;
     const maxZoom = collection[0].max_zoom;
 
@@ -323,7 +322,8 @@ export class PostGisConnection {
     const mvt_tmpl = `WITH mvtgeom AS (\
     SELECT ST_AsMVTGeom(geom, ST_TileEnvelope(${z},${x},${y}), extent => ${extent},  buffer => ${buffer}) AS geom, properties \
       FROM ${feature_table} \
-      WHERE geom && ST_TileEnvelope(${z},${x},${y}, margin=> (${buffer_fp}/${extent}))) \
+      WHERE geom && ST_TileEnvelope(${z},${x},${y}, margin=> (${buffer_fp}/${extent})) \
+      AND ft_collection = '${collId}') \
     SELECT ST_AsMVT(mvtgeom.*, '${name}') FROM mvtgeom;`;
 
     const mvt_resp = await Features.query(mvt_tmpl);
