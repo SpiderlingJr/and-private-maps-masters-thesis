@@ -1,16 +1,10 @@
-import tap, { test } from "tap";
+import { test } from "tap";
 import { app } from "../src/app.js";
 import FormData from "form-data";
 import { createReadStream } from "fs";
-import { styleSchema } from "../src/schema/httpRequestSchemas.js";
-import { JobState } from "../src/entities/jobs.js";
 
-import { PostGisConnection } from "../src/util/PostGisConnection.js";
 import { waitForUploadJobCompletion } from "./test_util/injects.js";
-// TODO inject some test data for each manipulation
-// TODO test-collection for each test case / sequence
 
-//TODO
 test("general suite", async (t) => {
   t.teardown(process.exit);
 
