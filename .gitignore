@@ -1,7 +1,9 @@
 .nyc_output
+.env
 node_modules
 coverage
 storage
 storage/*
 inputs
 package-lock.json
+test/data/big_**

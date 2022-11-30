@@ -4,6 +4,10 @@ const collIdSchema = Type.Object({
   collId: Type.String(),
 });
 
+const jobIdSchema = Type.Object({
+  jobId: Type.String(),
+});
+
 const styleSchema = Type.Object({
   Style: Type.Object({
     minZoom: Type.Integer({ minimum: 0, maximum: 22, default: 0 }),
@@ -24,6 +28,7 @@ const getCollectionOptionsSchema = Type.Object({
   bbox: Type.Optional(Type.String()),
 });
 export {
+  jobIdSchema,
   styleSchema,
   collIdSchema,
   collIdZXYSchema,

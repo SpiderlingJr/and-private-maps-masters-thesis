@@ -3,7 +3,7 @@ import { GeodataUpstreamHandler } from "../src/util/GeodataUpstreamHandler.js";
 import { PostGisConnection } from "../src/util/PostGisConnection.js";
 
 test("validation pipeline passthrough on valid data", async (t) => {
-  const valid_file = "test/data/valid_ndjson.ndjson";
+  const valid_file = "test/data/valid_ndjson_1.ndjson";
   const uuid_for_valid = "ddedecf6-4ae9-11ed-b878-0242ac120002";
   const dbConn = new PostGisConnection();
   const handler = new GeodataUpstreamHandler(dbConn);

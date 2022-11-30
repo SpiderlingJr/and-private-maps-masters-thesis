@@ -17,7 +17,9 @@ import {
   collIdSchema,
   collIdZXYSchema,
   getCollectionOptionsSchema,
+  jobIdSchema,
 } from "./schema/httpRequestSchemas.js";
+import { JobState } from "./entities/jobs.js";
 
 const pump = promisify(pipeline);
 
@@ -55,6 +57,21 @@ app.register(fastifyMultipart, {
   },
 });
 
+const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
+  if (err) {
+    app.log.error(err);
+  }
+  await app.close();
+};
+
+// delay is the number of milliseconds for the graceful close to finish
+const closeListeners = closeWithGrace(
+  {
+    delay: parseInt(process.env.FASTIFY_CLOSE_GRACE_DELAY || "") || 500,
+  },
+  handler
+);
+
 // Landing Page
 app.get("/", function (request, reply) {
   const response = {
@@ -71,19 +88,18 @@ app.get("/conformance", function (request, reply) {
   reply.send(conformance);
 });
 
-const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
-  if (err) {
-    app.log.error(err);
-  }
-  await app.close();
-};
-
-// delay is the number of milliseconds for the graceful close to finish
-const closeListeners = closeWithGrace(
+app.get(
+  "/job/:jobId",
   {
-    delay: parseInt(process.env.FASTIFY_CLOSE_GRACE_DELAY || "") || 500,
+    schema: { params: jobIdSchema },
   },
-  handler
+  async function (request, reply) {
+    const { jobId } = request.params;
+
+    const jobResponse = (await pgConn.getJobById(jobId))[0];
+
+    reply.send(jobResponse);
+  }
 );
 
 app.get("/collections", function (request, reply) {
@@ -248,7 +264,7 @@ app.post("/data", async function (req: FastifyRequest, reply) {
     featureValidator.validateAndUploadGeoFeature(tmpStorage, jobId);
   });
 
-  reply.send(jobId);
+  reply.code(200).send(jobId);
 });
 
 /**
@@ -272,6 +288,7 @@ app.post(
     }
     try {
       await pgConn.setStyle(collId, request.body.Style);
+      mvtCache.clear();
       reply.code(200).send();
     } catch (e) {
       reply.code(404).send(e);
@@ -289,10 +306,14 @@ app.get(
     const { collId, z, x, y } = request.params;
 
     const mvt = pgConn.getMVT(collId, z, x, y);
-    reply.send(mvt);
+    reply.code(200).send(mvt);
   }
 );
 
+/**
+ * Requests the geometry and property data of a given collection, and returns a VMT protobuf object
+ * containing the feature data of requested zoom levels and x/y coordinates.
+ */
 app.get(
   "/collections/:collId/:z/:x/:y.vector.pbf",
   {
@@ -306,26 +327,54 @@ app.get(
     // TODO get minzoom / maxzoom of requested collection
     const { minZoom, maxZoom } = await pgConn.getCollectionZoomLevel(collId);
 
-    if (minZoom <= z && z <= maxZoom) {
-      // Is MVT already in cache?
-      let mvt = mvtCache.get(`${z}/${x}/${y}`);
-      if (mvt) {
-        console.log(`we have mvt ${z}/${x}/${y} at home`);
-        reply.send(mvt[0].st_asmvt);
-      } else {
-        // Not already cached, request and cache.
+    console.log(minZoom, maxZoom);
+    // return nothing if z is out of bounds for zoom levels
+    if (!(minZoom <= z && z <= maxZoom)) {
+      console.log("Out of bounds");
+      reply.code(200).send();
+      return;
+    }
+    // Is MVT already in cache?
+    let mvt = mvtCache.get(`${z}/${x}/${y}`);
 
-        console.log(`thats new! ${z}/${x}/${y} `);
-        mvt = await pgConn.getMVT(collId, z, x, y);
-        mvtCache.set(`${z}/${x}/${y}`, mvt);
-        reply.send(mvt[0].st_asmvt);
-      }
+    if (mvt) {
+      reply.send(mvt[0].st_asmvt);
     } else {
-      reply.send(200);
+      // Not already cached, request and cache.
+      console.log("NOT IN CACHE");
+      mvt = await pgConn.getMVT(collId, z, x, y);
+      console.log("mvt", mvt);
+      mvtCache.set(`${z}/${x}/${y}`, mvt);
+
+      reply.send(mvt[0].st_asmvt);
     }
   }
 );
 
+// For testing the cache
+app.get(
+  "/cache/:z/:x/:y",
+  {
+    schema: {
+      params: Type.Object({
+        x: Type.Integer(),
+        y: Type.Integer(),
+        z: Type.Integer(),
+      }),
+    },
+  },
+  async function (request, reply) {
+    const { z, x, y } = request.params;
+
+    const mvt = mvtCache.get(`${z}/${x}/${y}`);
+
+    if (mvt) {
+      reply.code(200).send(mvt[0].st_asmvt);
+    } else {
+      reply.code(404);
+    }
+  }
+);
 /*
 // Insert data into db if not already exists
 // Todo implement put
@@ -397,9 +446,38 @@ app.patch("/data", async function name(req, reply) {
 });
 
 // Delete existing data
-app.delete("/data", async function name(req, reply) {
-  throw Error("Not yet implemented");
-});
+app.delete(
+  "/collections/:collId",
+  {
+    schema: {
+      params: collIdSchema,
+    },
+  },
+  async function name(req, reply) {
+    const { collId } = req.params;
+
+    const jobId = await pgConn.createNewJob();
+    const delResponse = await pgConn
+      .deleteCollection(collId, jobId)
+      .then(async (response) => {
+        const jobResponse = await pgConn.updateJob(
+          jobId,
+          JobState.FINISHED,
+          collId
+        );
+      })
+      .catch(async (err) => {
+        const jobResponse = await pgConn.updateJob(
+          jobId,
+          JobState.ERROR,
+          collId,
+          err
+        );
+      });
+
+    reply.send(jobId);
+  }
+);
 
 app.get("/newzea", async function (req, reply) {
   const mvt = await pgConn.mvtDummyData();
