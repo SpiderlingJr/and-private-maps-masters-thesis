@@ -15,7 +15,7 @@ test("general suite", async (t) => {
   t.teardown(process.exit);
 
   t.test("sub1: standard workflow", async (sub1) => {
-    sub1.plan(6);
+    sub1.plan(8);
 
     // upload a valid ndjson file
     const form = new FormData();
@@ -37,15 +37,23 @@ test("general suite", async (t) => {
     const jobResponse = await waitForUploadJobCompletion(jobId);
     const cid = JSON.parse(jobResponse.body).job_collection;
 
-    // TODO assert /collections contains an entry for cid
+    // try to get a listing of collections
     const collectionInfoReponse = await app.inject({
       method: "GET",
       url: `/collections`,
     });
-    //console.log(collectionInfoReponse.body);
-    const cInfo = JSON.parse(collectionInfoReponse.body)[0];
-    //t.equal(true, cid in cInfo, "collId should be in collection info");
     sub1.equal(collectionInfoReponse.statusCode, 200);
+
+    // assert the recently published collection is listed in the collections
+    const cInfo = JSON.parse(collectionInfoReponse.body);
+    let cidInCollections = false;
+    for (const col of cInfo) {
+      if (col["coll_id"] == cid) {
+        cidInCollections = true;
+        break;
+      }
+    }
+    sub1.equal(true, cidInCollections, "collId should be in collection info");
 
     // TODO try to get data for that new collection
     // TODO check if the entries are correct
@@ -81,13 +89,14 @@ test("general suite", async (t) => {
       method: "GET",
       url: `/collections/${cid}/${badZoom}/2/3.vector.pbf`,
     });
-    sub1.equal(styleResponse.statusCode, 200);
+    sub1.equal(oobMvtResponse.statusCode, 200);
+    sub1.equal(oobMvtResponse.body.length, 0);
 
     // try receiving data in bounds of style
     const okZoom = 8;
     const okMvtResponse = await app.inject({
       method: "GET",
-      url: `/collections/${cid}/${okZoom}/2/3.vector.pbf`,
+      url: `/collections/${cid}/${okZoom}/1/0.vector.pbf`,
     });
     sub1.equal(okMvtResponse.statusCode, 200);
 
