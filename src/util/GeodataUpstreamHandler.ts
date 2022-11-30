@@ -32,7 +32,7 @@ export class GeodataUpstreamHandler {
    * @param jobId
    */
   async validateAndPatchGeoFeature(fpath: string, jobId: string) {
-    const tmpCsvStorage = "storage/validated/" + makeId() + ".csv";
+    const tmpValidatedCsv = "storage/validated/" + makeId() + ".csv";
 
     // Create new collection for feature batch
     const colId = await this.postgis.createNewCollection();
@@ -44,7 +44,7 @@ export class GeodataUpstreamHandler {
       "PatchValidation"
     );
     const patchToCsvTransform = new PatchJsonToCsvTransform();
-    const writeStream = createWriteStream(tmpCsvStorage);
+    const writeStream = createWriteStream(tmpValidatedCsv);
 
     // Start validating uploaded geofeatures
     const validationPipeline = pipeline(
@@ -75,10 +75,10 @@ export class GeodataUpstreamHandler {
       // Upon finishing validation, upload file if valid, else declare job failed.
       .then(() => {
         this.postgis
-          .pgPatch(tmpCsvStorage)
+          .pgPatch(tmpValidatedCsv)
           .then(() => {
             this.postgis.updateJob(jobId, JobState.FINISHED, colId);
-            //this.removeFile(tmpCsvStorage);
+            this.removeFile(tmpValidatedCsv);
           })
           .catch((err) => {
             this.postgis.updateJob(
@@ -100,6 +100,7 @@ export class GeodataUpstreamHandler {
         this.removeFile(fpath);
       });
   }
+
   /**
    * Reads a file from path, validates it's geojson content and streams it to database
    * @param fpath path to json-file
@@ -111,7 +112,7 @@ export class GeodataUpstreamHandler {
     jobId: string,
     deleteTmpFile = true
   ) {
-    const tmpCsvStorage = "storage/validated/" + makeId() + ".csv";
+    const tmpValidatedCsv = `storage/validated/${makeId()}.csv`;
 
     // Create new collection for feature batch
     const colId = await this.postgis.createNewCollection();
@@ -120,7 +121,7 @@ export class GeodataUpstreamHandler {
     const readLineTransform = new ReadlineTransform();
     const geoValidationTransform = new GeoValidationTransform();
     const jsonToCsvTransform = new GeoJsonToCsvTransform(colId);
-    const writeStream = createWriteStream(tmpCsvStorage);
+    const writeStream = createWriteStream(tmpValidatedCsv);
 
     // Start validating uploaded geofeatures
     const validationPipeline = pipeline(
@@ -151,10 +152,10 @@ export class GeodataUpstreamHandler {
       // Upon finishing validation, upload file if valid, else declare job failed.
       .then(() => {
         this.postgis
-          .pgCopyInsert(tmpCsvStorage)
+          .pgCopyInsert(tmpValidatedCsv)
           .then(() => {
             this.postgis.updateJob(jobId, JobState.FINISHED, colId);
-            this.removeFile(tmpCsvStorage);
+            this.removeFile(tmpValidatedCsv);
           })
           .catch((err) => {
             this.postgis.updateJob(
