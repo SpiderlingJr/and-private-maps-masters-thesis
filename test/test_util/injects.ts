@@ -3,9 +3,11 @@ import { JobState } from "../../src/entities/jobs";
 import { app } from "../../src/app.js";
 
 /**
- * Tries to
+ * Tries to receive metadata from a performed job. If the job is not yet complete, it retries up to maxRetries times.
  * @param jobId id of the job to wait for completion
- * @returns
+ * @param interval retry-interval in ms, default 1000
+ * @param maxRetries number of maximum retries, default 5
+ * @returns job info response
  */
 async function waitForUploadJobCompletion(
   jobId: string,
@@ -25,6 +27,7 @@ async function waitForUploadJobCompletion(
       throw new Error("PENDING");
     return jobResponse;
   }
+
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const retryOperation = (operation, delay, retries) =>
     new Promise((resolve, reject) => {
