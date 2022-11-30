@@ -6,3 +6,4 @@ storage
 storage/*
 inputs
 package-lock.json
+test/data/big_**

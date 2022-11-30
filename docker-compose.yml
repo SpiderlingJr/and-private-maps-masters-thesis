@@ -1,0 +1,67 @@
+version: "3"
+
+volumes:
+  db_data:
+  importer_data:
+  pgadmin_data:
+  redis_data:
+
+networks:
+  idp:
+
+services:
+  pgadmin4:
+    image: dpage/pgadmin4
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=idp@tum.de
+      - PGADMIN_DEFAULT_PASSWORD=idpdev
+    ports:
+      - 8080:80
+    networks:
+      - idp
+
+  db:
+    image: postgis/postgis:15-3.3-alpine
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+    env_file:
+      - .env
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - idp
+    ports:
+      - 8081:5432 # 5432 is usually occupied by postgresql on the host
+
+  redis:
+    image: redis:5-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      # expo se port 6378 to the host,
+      # so that we can connect to it from
+      # outside wihout interfering with
+      # the host's redis
+      - "6378:6379"
+#  importer:
+#    command: importer update
+#    build:
+#      context: importer
+#      dockerfile: Dockerfile
+#    volumes:
+#      - importer_data:/data
+#      - ./importer/download:/download
+#      - ./importer/mapping.yml:/data/mapping.yml
+#    env_file:
+#      - .env
+#    environment:
+#      POSTGRES_HOST: db
+#      PBF_URL: http://download.geofabrik.de/europe/germany/bayern-latest.osm.pbf
+#      REPLICATION_URL: https://download.geofabrik.de/europe/germany/bayern-updates/
+#      REPLICATION_INTERVAL: 24h
+#    networks:
+#      - idp
+
