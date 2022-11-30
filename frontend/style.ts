@@ -55,7 +55,8 @@ export function createMapboxStreetsV6Style(): StyleLike {
     const maki = feature.get("maki");
     const geom = feature.getGeometry()?.getType();
     if (layer == "default") {
-      fill.setColor("#000");
+      fill.setColor("rgba(255, 255, 128, 0.33)");
+      stroke.setWidth(48);
       styles[length++] = polygon;
     } else if (layer == "landuse" && cls == "park") {
       fill.setColor("#d8e8c8");
