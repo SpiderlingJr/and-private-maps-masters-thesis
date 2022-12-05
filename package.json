@@ -47,6 +47,7 @@
     "@types/pg": "^8.6.5",
     "@types/pg-copy-streams": "^1.2.1",
     "@types/pg-pool": "^2.0.3",
+    "@types/redis": "^4.0.11",
     "@types/wellknown": "^0.5.3",
     "close-with-grace": "^1.1.0",
     "fastify": "^4.5.3",
@@ -57,6 +58,7 @@
     "ol": "^7.1.0",
     "pg": "^8.8.0",
     "pg-pool": "^3.5.2",
+    "redis": "^4.5.1",
     "typeorm": "^0.3.10",
     "util.promisify": "^1.1.1",
     "wellknown": "^0.5.0"
