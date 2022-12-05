@@ -41,11 +41,11 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      # expo se port 6378 to the host,
+      # expose port 6378 to the host,
       # so that we can connect to it from
       # outside wihout interfering with
       # the host's redis
-      - "6378:6379"
+      - 6378:6379
 #  importer:
 #    command: importer update
 #    build:
