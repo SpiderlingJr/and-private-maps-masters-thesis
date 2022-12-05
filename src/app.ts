@@ -12,6 +12,7 @@ import * as path from "path";
 import { PostGisConnection } from "./util/PostGisConnection.js";
 import appLinks from "./data/landingPage.js";
 import conformance from "./data/conformance.js";
+
 import {
   styleSchema,
   collIdSchema,
@@ -20,14 +21,13 @@ import {
   jobIdSchema,
 } from "./schema/httpRequestSchemas.js";
 import { JobState } from "./entities/jobs.js";
+import { MvtCache } from "./util/MvtCache.js";
 
 const pump = promisify(pipeline);
 
-const mvtCache = new Map();
+const mvtCache = new MvtCache();
 const pgConn = new PostGisConnection();
 const featureValidator = new GeodataUpstreamHandler(pgConn);
-
-//const logStream = createWriteStream("./cachelog.txt");
 
 // Instantiate Fastify with some config
 const app = fastify({
@@ -71,6 +71,11 @@ const closeListeners = closeWithGrace(
   },
   handler
 );
+
+app.addHook("onClose", (instance, done) => {
+  closeListeners.uninstall();
+  done();
+});
 
 // Landing Page
 app.get("/", function (request, reply) {
@@ -176,11 +181,6 @@ app.get(
       });
   }
 );
-
-app.addHook("onClose", (instance, done) => {
-  closeListeners.uninstall();
-  done();
-});
 
 app.get(
   "/collections/:collId/items/:featId",
@@ -323,30 +323,28 @@ app.get(
   },
   async function (request, reply) {
     const { collId, z, x, y } = request.params;
-
-    // TODO get minzoom / maxzoom of requested collection
+    const zxy_key = `${z}/${x}/${y}`;
     const { minZoom, maxZoom } = await pgConn.getCollectionZoomLevel(collId);
 
-    console.log(minZoom, maxZoom);
-    // return nothing if z is out of bounds for zoom levels
+    // return nothing if z is out of bounds for zoom levels of requested collection
     if (!(minZoom <= z && z <= maxZoom)) {
-      console.log("Out of bounds");
+      console.log("Out of bounds", minZoom, maxZoom);
       reply.code(200).send();
       return;
     }
-    // Is MVT already in cache?
-    let mvt = mvtCache.get(`${z}/${x}/${y}`);
-
-    if (mvt) {
-      reply.send(mvt[0].st_asmvt);
+    // Try fetching requested tile from cache
+    const cachedMvt = await mvtCache.getTile(zxy_key);
+    if (cachedMvt) {
+      reply.send(cachedMvt);
     } else {
-      // Not already cached, request and cache.
-      console.log("NOT IN CACHE");
-      mvt = await pgConn.getMVT(collId, z, x, y);
-      console.log("mvt", mvt);
-      mvtCache.set(`${z}/${x}/${y}`, mvt);
+      // tile not in cache, request from db and cache.
+      let mvt = await pgConn.getMVT(collId, z, x, y);
+      mvt = mvt[0].st_asmvt;
 
-      reply.send(mvt[0].st_asmvt);
+      // Store new tile in cache
+      mvtCache.cacheTile(zxy_key, mvt);
+
+      reply.send(mvt);
     }
   }
 );
@@ -366,10 +364,9 @@ app.get(
   async function (request, reply) {
     const { z, x, y } = request.params;
 
-    const mvt = mvtCache.get(`${z}/${x}/${y}`);
-
+    const mvt = await mvtCache.getTile(`${z}/${x}/${y}`);
     if (mvt) {
-      reply.code(200).send(mvt[0].st_asmvt);
+      reply.code(200).send(mvt);
     } else {
       reply.code(404);
     }

@@ -3,7 +3,6 @@ import { TmpFeatures, Features } from "src/entities/features.js";
 import { Collections } from "src/entities/collections.js";
 import { Jobs, JobState } from "src/entities/jobs.js";
 import { DataSource } from "typeorm";
-
 import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner.js";
 import pgcopy from "pg-copy-streams";
 import { pipeline } from "stream/promises";
@@ -15,6 +14,10 @@ const features_db = "features_test";
 export class PostGisConnection {
   conn: DataSource;
   connPromise: Promise<DataSource>;
+
+  constructor() {
+    this.connPromise = this.connectDB();
+  }
 
   async connectDB(): Promise<DataSource> {
     try {
@@ -33,10 +36,6 @@ export class PostGisConnection {
     } catch (err) {
       throw new Error("Error while trying to connect to database:\n" + err);
     }
-  }
-
-  constructor() {
-    this.connPromise = this.connectDB();
   }
 
   async initialized() {
