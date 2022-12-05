@@ -225,7 +225,7 @@ test("general suite", async (t) => {
     const form = new FormData();
     form.append(
       "valid_data",
-      createReadStream(`test/data/valid_ndjson_2.ndjson`)
+      createReadStream(`test/data/germany_outline.ndjson`)
     );
 
     const uploadResponse = await app.inject({
@@ -240,7 +240,7 @@ test("general suite", async (t) => {
     const jobId = uploadResponse.body;
     const jobResponse = await waitForUploadJobCompletion(jobId);
     const cid = JSON.parse(jobResponse.body).job_collection;
-
+    console.log("cid: ", cid);
     sub4.test(
       "try setting a minZoom level bigger than maxZoom on an existing collection",
       async (t) => {
@@ -294,8 +294,8 @@ test("general suite", async (t) => {
       "test if requested pbfs are properly stored in cache",
       async (t) => {
         // Request any tile
-        const pbf_request = `/collections/${cid}/3/3/2.vector.pbf`;
-        const cache_request = "/cache/3/3/2";
+        const pbf_request = `/collections/${cid}/3/4/2.vector.pbf`;
+        const cache_request = "/cache/3/4/2";
 
         // assert cache doesnt have an entry at that position on loadup
         const cachePreRequest = await app.inject({
@@ -313,7 +313,11 @@ test("general suite", async (t) => {
           method: "GET",
           url: cache_request,
         });
-        t.equal(cachePostRequest.statusCode, 200);
+        t.equal(
+          cachePostRequest.statusCode,
+          200,
+          "couldnt receive cached tile"
+        );
         t.equal(cachePostRequest.body, response.body);
       }
     );
