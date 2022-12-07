@@ -21,11 +21,12 @@ import {
   jobIdSchema,
 } from "./schema/httpRequestSchemas.js";
 import { JobState } from "./entities/jobs.js";
-import { MvtCache } from "./util/MvtCache.js";
+//import { MvtCache } from "./util/MvtCache.js";
+import cachePlugin from "./plugins/cachePlugin.js";
 
 const pump = promisify(pipeline);
 
-const mvtCache = new MvtCache();
+//const mvtCache = new MvtCache();
 const pgConn = new PostGisConnection();
 const featureValidator = new GeodataUpstreamHandler(pgConn);
 
@@ -55,6 +56,10 @@ app.register(fastifyMultipart, {
   limits: {
     files: 1, // cannot handle more than 1 file atm
   },
+});
+
+app.register(cachePlugin, {
+  strategy: process.env.STRATEGY as "memory" | "redis" | undefined,
 });
 
 const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
@@ -288,7 +293,8 @@ app.post(
     }
     try {
       await pgConn.setStyle(collId, request.body.Style);
-      mvtCache.clear();
+      app.cache.clear();
+      //mvtCache.clear();
       reply.code(200).send();
     } catch (e) {
       reply.code(404).send(e);
@@ -333,7 +339,9 @@ app.get(
       return;
     }
     // Try fetching requested tile from cache
-    const cachedMvt = await mvtCache.getTile(zxy_key);
+    //const cachedMvt = await mvtCache.getTile(zxy_key);
+    const cachedMvt = await app.cache.get(zxy_key);
+
     if (cachedMvt) {
       reply.send(cachedMvt);
     } else {
@@ -342,8 +350,8 @@ app.get(
       mvt = mvt[0].st_asmvt;
 
       // Store new tile in cache
-      mvtCache.cacheTile(zxy_key, mvt);
-
+      //mvtCache.cacheTile(zxy_key, mvt);
+      app.cache.set(zxy_key, mvt);
       reply.send(mvt);
     }
   }
@@ -364,7 +372,8 @@ app.get(
   async function (request, reply) {
     const { z, x, y } = request.params;
 
-    const mvt = await mvtCache.getTile(`${z}/${x}/${y}`);
+    //const mvt = await mvtCache.getTile(`${z}/${x}/${y}`);
+    const mvt = await app.cache.get(`${z}/${x}/${y}`);
     if (mvt) {
       reply.code(200).send(mvt);
     } else {
@@ -480,6 +489,11 @@ app.get("/newzea", async function (req, reply) {
   const mvt = await pgConn.mvtDummyData();
 
   reply.code(200).send(mvt);
+});
+
+app.get("/doink", async function (req, reply) {
+  await app.cache.set("doink", "poink");
+  reply.send(200);
 });
 
 export { app };
