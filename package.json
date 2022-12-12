@@ -53,6 +53,7 @@
     "@types/pg-pool": "^2.0.3",
     "@types/redis": "^4.0.11",
     "@types/wellknown": "^0.5.3",
+    "ajv": "^8.11.2",
     "close-with-grace": "^1.1.0",
     "esbuild": "^0.16.1",
     "fastify": "^4.5.3",
