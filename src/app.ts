@@ -269,6 +269,7 @@ app.post("/data", async function (req: FastifyRequest, reply) {
     featureValidator.validateAndUploadGeoFeature(tmpStorage, jobId);
   });
 
+  await app.cache.clear();
   reply.code(200).send(jobId);
 });
 
@@ -293,7 +294,7 @@ app.post(
     }
     try {
       await pgConn.setStyle(collId, request.body.Style);
-      app.cache.clear();
+      await app.cache.clear();
       //mvtCache.clear();
       reply.code(200).send();
     } catch (e) {
