@@ -1,4 +1,4 @@
-import { test } from "tap";
+import { test, todo } from "tap";
 import { PostGisConnection } from "../src/util/PostGisConnection.js";
 
 test("add new job, then remove it", async (t) => {
@@ -22,7 +22,7 @@ test("add new job, then remove it", async (t) => {
   await pgconn.close();
 });
 
-test("generate new collection, then remove it", async (t) => {
+todo("generate new collection, then remove it", async (t) => {
   // obsolete, as scenario is identical to job-test
 });
 
