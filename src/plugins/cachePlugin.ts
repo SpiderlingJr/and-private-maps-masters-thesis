@@ -12,7 +12,7 @@ const storeSymbol = Symbol("store");
  * Implement this interface to provide a cache strategy
  */
 interface Cache<T = Map<string, string> | FastifyRedis> {
-  get(key: string): Promise<string | undefined | null>;
+  get(key: string): Promise<string | Buffer | undefined | null>;
   set(key: string, value: string, ttl?: number): Promise<void>;
   del(key: string): Promise<void>;
   clear(): Promise<void>;
@@ -35,9 +35,12 @@ const cachePlugin: FastifyPluginAsync<{
     fastify.decorate("cache", {
       [storeSymbol]: fastify.redis, // storeSymbol is a symbol that is used to store the redis client in the cache object
       async get(key: string) {
-        return fastify.redis.get(key);
+        //return fastify.redis.get(key);
+
+        return fastify.redis.getBuffer(key);
       },
       async set(key: string, value: string, ttl?: number) {
+        //fastify.redis.set(key, value);
         fastify.redis.set(key, value);
       },
       async del(key: string) {

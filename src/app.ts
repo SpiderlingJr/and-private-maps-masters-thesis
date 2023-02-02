@@ -293,6 +293,7 @@ app.post("/data", async function (req: FastifyRequest, reply) {
     featureValidator.validateAndUploadGeoFeature(tmpStorage, jobId);
   });
 
+  await app.cache.clear();
   reply.code(200).send(jobId);
 });
 
@@ -317,7 +318,7 @@ app.post(
     }
     try {
       await pgConn.setStyle(collId, request.body.Style);
-      app.cache.clear();
+      await app.cache.clear();
       //mvtCache.clear();
       reply.code(200).send();
     } catch (e) {
@@ -363,19 +364,22 @@ app.get(
       return;
     }
     // Try fetching requested tile from cache
-    //const cachedMvt = await mvtCache.getTile(zxy_key);
     const cachedMvt = await app.cache.get(zxy_key);
 
+    if (cachedMvt === "") {
+      reply.code(204).send();
+    }
     if (cachedMvt) {
+      //const mvt = Buffer.from(cachedMvt, "base64");
+      //reply.send(mvt);
       reply.send(cachedMvt);
     } else {
       // tile not in cache, request from db and cache.
       let mvt = await pgConn.getMVT(collId, z, x, y);
       mvt = mvt[0].st_asmvt;
-
       // Store new tile in cache
-      //mvtCache.cacheTile(zxy_key, mvt);
-      app.cache.set(zxy_key, mvt);
+      await app.cache.set(zxy_key, mvt);
+
       reply.send(mvt);
     }
   }

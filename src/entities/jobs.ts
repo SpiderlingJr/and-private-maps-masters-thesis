@@ -4,8 +4,6 @@ import {
   Column,
   PrimaryGeneratedColumn,
   CreateDateColumn,
-  ManyToOne,
-  JoinColumn,
 } from "typeorm";
 import { Collections } from "./collections";
 

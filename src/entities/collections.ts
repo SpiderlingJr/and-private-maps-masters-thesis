@@ -10,4 +10,7 @@ export class Collections extends BaseEntity {
 
   @Column({ type: "int", default: 22 })
   max_zoom: number;
+
+  @Column({ type: "jsonb", nullable: true })
+  properties: string;
 }
