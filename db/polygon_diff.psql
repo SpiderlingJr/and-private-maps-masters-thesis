@@ -1,0 +1,111 @@
+-- Finds the difference between two polygons and inserts the result into a new row in the table
+-- The difference is a polygon
+-- Problem: Its relevant, which polygon goes first
+/* 
+DO $$ 
+DECLARE  
+    poly1 geometry;
+	poly2 geometry;
+	res varchar(255);
+BEGIN  
+	SELECT geom INTO poly1 from somepolys where somepolys.polid = 1;
+	SELECT geom INTO poly2 from somepolys where somepolys.polid = 3;
+	
+	RAISE NOTICE 'poly1(%)', poly1;
+	RAISE NOTICE 'poly2(%)', poly2;
+	
+	SELECT * FROM ST_AsText(ST_Difference(poly2::geometry, poly1::geometry)) 
+	into RES;
+	RAISE NOTICE 'res(%)', res;
+	
+	
+	INSERT into somepolys(name, geom) VALUES ('fakeArea', RES::geometry);
+END $$;
+*/
+
+-- Try to use ST_Union - ST_Intersect
+/*
+DO $$
+DECLARE  
+    poly1 geometry;
+	poly2 geometry;
+	res varchar(255);
+BEGIN  
+	SELECT geom INTO poly1 from somepolys where somepolys.polid = 1;
+	SELECT geom INTO poly2 from somepolys where somepolys.polid = 3;
+	
+	RAISE NOTICE 'poly1(%)', poly1;
+	RAISE NOTICE 'poly2(%)', poly2;
+	
+	SELECT * FROM ST_AsText(ST_Union(poly2::geometry, poly1::geometry)) 
+	into RES;
+	RAISE NOTICE 'res(%)', res;
+	
+	
+	INSERT into somepolys(name, geom) VALUES ('fullarea', RES::geometry);
+END $$;
+*/
+
+/*
+DO $$
+DECLARE  
+    poly1 geometry;
+	poly2 geometry;
+	res varchar(255);
+BEGIN  
+	SELECT geom INTO poly1 from somepolys where somepolys.polid = 1;
+	SELECT geom INTO poly2 from somepolys where somepolys.polid = 3;
+	
+	RAISE NOTICE 'poly1(%)', poly1;
+	RAISE NOTICE 'poly2(%)', poly2;
+	
+	SELECT * FROM ST_AsText(ST_Intersection(poly2::geometry, poly1::geometry)) 
+	into RES;
+	RAISE NOTICE 'res(%)', res;
+	
+	
+	INSERT into somepolys(name, geom) VALUES ('interArea', RES::geometry);
+END $$;
+*/
+
+-- Find difference polygon of Union and Intersection
+/*
+DO $$
+DECLARE  
+    poly1 geometry;
+	poly2 geometry;
+	res varchar(255);
+BEGIN  
+	SELECT geom INTO poly1 from somepolys where somepolys.polid = 6;
+	SELECT geom INTO poly2 from somepolys where somepolys.polid = 7;
+	
+	RAISE NOTICE 'poly1(%)', poly1;
+	RAISE NOTICE 'poly2(%)', poly2;
+	
+	SELECT * FROM ST_AsText(ST_Difference(poly1::geometry, poly2::geometry)) 
+	into RES;
+	RAISE NOTICE 'res(%)', res;
+	
+	
+	INSERT into somepolys(name, geom) VALUES ('fullarea', RES::geometry);
+END $$;
+*/
+
+-- Exterior Ring
+DO $$
+DECLARE  
+    poly1 geometry;
+	res varchar(255);
+BEGIN  
+	SELECT geom INTO poly1 from somepolys where somepolys.polid = 7;
+
+	
+	RAISE NOTICE 'poly1(%)', poly1;
+	
+	SELECT * FROM ST_AsText(ST_ExteriorRing(poly1::geometry, poly2::geometry)) 
+	into RES;
+	RAISE NOTICE 'res(%)', res;
+	
+	
+	INSERT into somepolys(name, geom) VALUES ('exteriorRing', RES::geometry);
+END $$;

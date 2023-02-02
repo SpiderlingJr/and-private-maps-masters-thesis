@@ -12,6 +12,12 @@ import * as path from "path";
 import { PostGisConnection } from "./util/PostGisConnection.js";
 import appLinks from "./data/landingPage.js";
 import conformance from "./data/conformance.js";
+import autoload from "@fastify/autoload";
+
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+import rroutes from "./routes/rroutes";
 
 import {
   styleSchema,
@@ -20,9 +26,11 @@ import {
   getCollectionOptionsSchema,
   jobIdSchema,
 } from "./schema/httpRequestSchemas.js";
+
 import { JobState } from "./entities/jobs.js";
-//import { MvtCache } from "./util/MvtCache.js";
 import cachePlugin from "./plugins/cachePlugin.js";
+//import { MvtCache } from "./util/MvtCache.js";
+//import cachePlugin from "./plugins/cachePlugin.js";
 
 const pump = promisify(pipeline);
 
@@ -52,14 +60,28 @@ const app = fastify({
   },
 }).withTypeProvider<TypeBoxTypeProvider>();
 
+app.register(cachePlugin, {
+  strategy: process.env.STRATEGY as "memory" | "redis" | undefined,
+});
+
+app.register(rroutes);
+
+//TODO How to get autoload to work? fails to import cache.
+/*
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+app.register(autoload, {
+  dir: join(__dirname, "./routes"),
+});
+*/
+/*app.register(autoload, {
+  dir: join(__dirname, "./plugins"),
+});*/
+
 app.register(fastifyMultipart, {
   limits: {
     files: 1, // cannot handle more than 1 file atm
   },
-});
-
-app.register(cachePlugin, {
-  strategy: process.env.STRATEGY as "memory" | "redis" | undefined,
 });
 
 const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
@@ -223,6 +245,7 @@ app.get(
   }
 );
 
+/*
 // Declare a route
 app.get(
   "/randomRoute",
@@ -238,6 +261,7 @@ app.get(
     reply.send({ foo: request.query.foo });
   }
 );
+*/
 
 app.post("/data", async function (req: FastifyRequest, reply) {
   const data = await req.file();
