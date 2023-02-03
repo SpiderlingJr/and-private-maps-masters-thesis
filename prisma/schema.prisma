@@ -1,0 +1,56 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JobState {
+  PENDING
+  FINISHED
+  ERROR
+}
+
+model PCollections {
+  coll_id    String      @id @default(uuid())
+  min_zoom   Int         @default(0)
+  max_zoom   Int         @default(22)
+  properties Json?
+  Features   PFeatures[]
+  Jobs       PJobs[]
+  //@@map("Collections")
+}
+
+model PFeatures {
+  feature_id       String                         @id @default(uuid())
+  ft_collection    PCollections                   @relation(fields: [ft_collection_id], references: [coll_id])
+  ft_collection_id String
+  geom             Unsupported("public.geometry")
+  properties       Json?
+  //@@map("Features")
+
+  @@index([geom], name: "geom_idx", type: Gist)
+}
+
+model PTmpFeatures {
+  tfeature_id String                          @id @default(uuid())
+  geom        Unsupported("public.geometry")?
+  properties  Json?
+  //@@map("PTmpFeatures")
+
+  @@index([geom], name: "tmp_geom_index", type: Gist)
+}
+
+model PJobs {
+  job_id         String        @id @default(uuid())
+  job_state      JobState      @default(PENDING)
+  job_collection PCollections? @relation(fields: [collectionsId], references: [coll_id])
+  job_note       String?
+  job_date       DateTime      @default(now())
+  collectionsId  String?
+}
