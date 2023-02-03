@@ -8,6 +8,11 @@ const jobIdSchema = Type.Object({
   jobId: Type.String(),
 });
 
+const collIdFeatureIdSchema = Type.Object({
+  collId: Type.String(),
+  featId: Type.String(),
+});
+
 const styleSchema = Type.Object({
   Style: Type.Object({
     minZoom: Type.Integer({ minimum: 0, maximum: 22, default: 0 }),
@@ -22,15 +27,26 @@ const collIdZXYSchema = Type.Object({
   z: Type.Integer(),
 });
 
-const getCollectionOptionsSchema = Type.Object({
+const collectionOptionsSchema = Type.Object({
   limit: Type.Optional(Type.String()),
   datetime: Type.Optional(Type.String()),
   bbox: Type.Optional(Type.String()),
 });
+
+const collectionItemQuerySchema = Type.Object({
+  querystring: Type.Object({
+    limit: Type.Optional(Type.String()),
+    datetime: Type.Optional(Type.String()),
+    bbox: Type.Optional(Type.String()),
+  }),
+});
+
 export {
   jobIdSchema,
   styleSchema,
   collIdSchema,
   collIdZXYSchema,
-  getCollectionOptionsSchema,
+  collectionOptionsSchema,
+  collectionItemQuerySchema,
+  collIdFeatureIdSchema,
 };
