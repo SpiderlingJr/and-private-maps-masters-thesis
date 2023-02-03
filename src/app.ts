@@ -84,3 +84,5 @@ app.addHook("onClose", (instance, done) => {
   closeListeners.uninstall();
   done();
 });
+
+export { app };
