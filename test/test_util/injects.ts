@@ -13,7 +13,7 @@ async function waitForUploadJobCompletion(
   jobId: string,
   interval = 1000,
   maxRetries = 5
-): Promise<LightMyRequest.Response> {
+): Promise<Response> {
   function delay(time) {
     return new Promise((resolve) => setTimeout(resolve, time));
   }
@@ -48,7 +48,7 @@ async function waitForUploadJobCompletion(
     getJobState,
     interval,
     maxRetries
-  ) as Promise<LightMyRequest.Response>;
+  ) as Promise<Response>;
   return jobResponse;
 }
 

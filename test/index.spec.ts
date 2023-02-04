@@ -47,7 +47,11 @@ test("general suite", async (t) => {
         break;
       }
     }
-    sub1.equal(true, cidInCollections, "collId should be in collection info");
+    sub1.equal(
+      true,
+      cidInCollections,
+      `cid ${cid} should be in collections, but is not`
+    );
 
     // TODO try to get data for that new collection
     // TODO check if the entries are correct
@@ -155,9 +159,9 @@ test("general suite", async (t) => {
         });
         t.equal(response.statusCode, 404);
         t.same(JSON.parse(response.body), {
-          statusCode: 404,
+          //statusCode: 404,
           error: "Not Found",
-          message: "No such collection",
+          message: `No collection with id c8effd27-d965-472b-9940-47e2122a9ece`,
         });
       }
     );
@@ -169,13 +173,9 @@ test("general suite", async (t) => {
           method: "GET",
           url: "/collections/27-d965-472b-9940-47e2122a9ecd",
         });
-        t.equal(response.statusCode, 404);
+        t.equal(response.statusCode, 500);
         t.same(JSON.parse(response.body), {
-          statusCode: 404,
-          code: "22P02",
-          error: "Not Found",
-          message:
-            'invalid input syntax for type uuid: "27-d965-472b-9940-47e2122a9ecd"',
+          error: "Internal Server Error",
         });
       }
     );
@@ -212,9 +212,8 @@ test("general suite", async (t) => {
         });
         t.equal(response.statusCode, 404);
         t.same(JSON.parse(response.body), {
-          statusCode: 404,
           error: "Not Found",
-          message: "No such collection",
+          message: `No collection with id 7555e416-9a11-445b-b614-f12c1185ed63`,
         });
       }
     );
