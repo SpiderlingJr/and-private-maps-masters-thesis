@@ -27,6 +27,12 @@ const collIdZXYSchema = Type.Object({
   z: Type.Integer(),
 });
 
+const xyzSchema = Type.Object({
+  x: Type.Integer(),
+  y: Type.Integer(),
+  z: Type.Integer(),
+});
+
 const collectionOptionsSchema = Type.Object({
   limit: Type.Optional(Type.String()),
   datetime: Type.Optional(Type.String()),
@@ -42,6 +48,7 @@ const collectionItemQuerySchema = Type.Object({
 });
 
 export {
+  xyzSchema,
   jobIdSchema,
   styleSchema,
   collIdSchema,
