@@ -15,6 +15,8 @@ import cacheRoutes from "./routes/cache";
 import crudRoutes from "./routes/crud";
 import styleRoutes from "./routes/style";
 import mvtRoutes from "./routes/mvt";
+import validatorPlugin from "./plugins/validatorPlugin.js";
+import filesPlugin from "./plugins/filesPlugin.js";
 
 // Instantiate Fastify with some config
 const app = fastify({
@@ -56,6 +58,8 @@ app.register(cachePlugin, {
   strategy: process.env.STRATEGY as "memory" | "redis" | undefined,
 });
 app.register(dbPlugin);
+app.register(validatorPlugin);
+app.register(filesPlugin);
 
 // Register routes
 app.register(helperRoutes);
