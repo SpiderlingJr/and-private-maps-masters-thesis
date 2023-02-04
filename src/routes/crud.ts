@@ -127,6 +127,7 @@ export default async function (
 
   // Insert data into db if already exists
   // TODO check if application type is ndjson
+  /*
   app.patch("/data", async function name(req, reply) {
     const data = await req.file();
 
@@ -174,13 +175,13 @@ export default async function (
         });
         return;
       } else {
-        app.db.copyStreamCollection(collId, outpath);
+        app.db.copyStreamCollection(collId);
         //featureValidator.validateAndPatchGeoFeature(tmpStorage, jobId);
       }
       reply.send({ jobId });
     });
   });
-
+*/
   /*
 // Insert data into db if not already exists
 // Todo implement put
