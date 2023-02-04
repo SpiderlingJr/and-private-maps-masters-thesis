@@ -9,6 +9,8 @@ export default async function (
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
+  options;
+
   // Registrate type provider as stated in https://www.fastify.io/docs/latest/Reference/Type-Providers/
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
 
@@ -61,8 +63,8 @@ export default async function (
         reply.send(cachedMvt);
       } else {
         // tile not in cache, request from db and cache.
-        let mvt = await app.db.getMVT(collId, z, x, y);
-        mvt = mvt[0].st_asmvt;
+        const res = await app.db.getMVT(collId, z, x, y);
+        const mvt = res[0].st_asmvt;
         // Store new tile in cache
         await app.cache.set(zxy_key, mvt);
 

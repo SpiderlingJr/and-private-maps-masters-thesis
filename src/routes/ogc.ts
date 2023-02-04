@@ -5,15 +5,9 @@ import { FastifyInstance } from "fastify";
 import appLinks from "../data/landingPage.js";
 import conformance from "../data/conformance.js";
 
-import { PostGisConnection } from "../util/PostGisConnection.js";
-import { GeodataUpstreamHandler } from "../util/GeodataUpstreamHandler.js";
-
 import {
-  styleSchema,
   collIdSchema,
-  collIdZXYSchema,
   collectionOptionsSchema,
-  jobIdSchema,
   collIdFeatureIdSchema,
   collectionItemQuerySchema,
 } from "../schema/httpRequestSchemas.js";
@@ -23,11 +17,13 @@ export default async function (
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
+  options;
+
   // Registrate type provider as stated in https://www.fastify.io/docs/latest/Reference/Type-Providers/
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
 
-  const pgConn = new PostGisConnection();
-  const featureValidator = new GeodataUpstreamHandler(pgConn);
+  //const pgConn = new PostGisConnection();
+  //const featureValidator = new GeodataUpstreamHandler(pgConn);
 
   // Landing Page
   app.get("/", function (request, reply) {
@@ -44,15 +40,17 @@ export default async function (
   });
 
   app.get("/collections", function (request, reply) {
-    pgConn
+    app.db
       .listCollections()
       .then((collections) => {
         reply.code(200);
         reply.send(collections);
       })
       .catch((err) => {
-        reply.code(500);
-        reply.send({ description: "Could not fetch collections." });
+        reply.code(500).send({
+          error: "Internal Server Error",
+          message: `${err}`,
+        });
       });
   });
 
@@ -72,7 +70,7 @@ export default async function (
       //const datetime = (request.query).datetime;
       //const bbox = request.query.bbox;
 
-      pgConn
+      app.db
         .getFeaturesByCollectionId(
           collId,
           Number(limit) ? Number(limit) : undefined
@@ -99,21 +97,22 @@ export default async function (
     function (request, reply) {
       const { collId } = request.params;
 
-      pgConn
+      app.db
         .getCollectionById(collId)
         .then((response) => {
-          if (response.length > 0) {
+          if (response) {
             reply.code(200).send(response);
           } else {
             reply.code(404).send({
-              statusCode: 404,
               error: "Not Found",
-              message: "No such collection",
+              message: `No collection with id ${collId}`,
             });
           }
         })
         .catch((err) => {
-          reply.code(404).send(err);
+          reply.code(500).send({
+            error: "Internal Server Error",
+          });
         });
     }
   );
@@ -129,20 +128,25 @@ export default async function (
     function (request, reply) {
       const { collId, featId } = request.params;
 
-      pgConn
+      app.db
         .getFeatureByCollectionIdAndFeatureId(collId, featId)
         .then((response) => {
           //const a = JSON.parse(response);
-          if (response.length > 0) {
+          if (response) {
             reply.code(200);
             reply.send(response);
           } else {
-            reply.code(404).send();
+            reply.code(404).send({
+              error: "Not Found",
+              message: `No feature with id ${featId} in collection ${collId}`,
+            });
           }
         })
         .catch((err) => {
-          reply.code(400);
-          reply.send(err);
+          reply.code(500).send({
+            error: "Internal Server Error",
+            message: `Could not fetch feature with id ${featId} in collection ${collId}. Error: ${err}`,
+          });
         });
     }
   );

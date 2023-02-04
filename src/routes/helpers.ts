@@ -9,6 +9,8 @@ export default async function (
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
+  options;
+
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
   // Declare a route
   app.get(
@@ -43,13 +45,29 @@ export default async function (
     async function (request, reply) {
       const { jobId } = request.params;
 
-      const jobResponse = (await pgConn.getJobById(jobId))[0];
+      const jobResponse = await app.db.getJobById(jobId);
 
+      if (!jobResponse) {
+        reply.code(404);
+        reply.send({ error: "Job not found" });
+        return;
+      }
       reply.send(jobResponse);
     }
   );
 
+  app.get("/newjob", async function (req, reply) {
+    const newJob = await app.db.createJob();
+
+    reply.code(200).send(newJob);
+  });
+
+  app.get("/doink", async function (req, reply) {
+    await app.cache.set("doink", "poink");
+    reply.send(200);
+  });
+
   app.addHook("onClose", async () => {
-    console.log("stopping routes");
+    console.log("stopping helper routes");
   });
 }

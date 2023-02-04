@@ -1,7 +1,6 @@
 /** Methods for interacting with the cache. */
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { FastifyPluginAsync } from "fastify";
 import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { xyzSchema } from "src/schema/httpRequestSchemas";
 
@@ -9,6 +8,8 @@ export default async function (
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
+  options;
+
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
 
   // For testing the cache

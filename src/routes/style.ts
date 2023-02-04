@@ -6,6 +6,8 @@ export default async function (
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
+  options;
+
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
 
   /**
@@ -35,7 +37,10 @@ export default async function (
         //mvtCache.clear();
         reply.code(200).send();
       } catch (e) {
-        reply.code(404).send(e);
+        reply.code(404).send({
+          error: "Not Found",
+          message: `No collection with id ${collId}`,
+        });
       }
     }
   );
