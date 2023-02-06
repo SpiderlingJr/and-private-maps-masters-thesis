@@ -19,8 +19,6 @@ export default async function (
 
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
   const pump = promisify(pipeline);
-  //const pgConn = new PostGisConnection();
-  //const featureValidator = new GeodataUpstreamHandler(pgConn);
 
   app.register(fastifyMultipart, {
     limits: {
@@ -53,48 +51,25 @@ export default async function (
 
     const jobId = await app.db.createJob();
     const colId = await app.db.createCollection();
-
-    // temporarily store received data, for later validation of geojson content
-    const receivedPath = path.join(
-      process.cwd(),
-      "storage",
-      "received",
-      jobId + ".ndjson"
-    );
-    const validatedPath = path.join(
-      process.cwd(),
-      "storage",
-      "validated",
-      jobId + ".csv"
-    );
-
-    await pump(data.file, createWriteStream(receivedPath)).then(async () => {
-      const valid = app.validate.validateGeoJson(
-        receivedPath,
-        validatedPath,
-        colId
-      );
+    await app.validate.validateData(data, colId, jobId).then(async (valid) => {
       if (!valid) {
-        await app.db.updateJob(
-          jobId,
-          JobState.ERROR,
-          colId,
-          "Invalid GeoJSON."
-        );
+        app.db.updateJob(jobId, JobState.ERROR, colId, "Invalid GeoJSON.");
         reply.code(400).send({
           error: "Bad Request",
           message: "Invalid GeoJSON.",
         });
         return;
       }
+
       await app.db.updateJob(
         jobId,
         JobState.PENDING,
         colId,
         "File validated, waiting for upload."
       );
+
       await app.db
-        .copyStreamCollection(validatedPath)
+        .copyStreamCollection(`./storage/validated/${jobId}.csv`)
         .then(async () => {
           await app.db.updateJob(
             jobId,
@@ -115,24 +90,20 @@ export default async function (
           // TODO change this to caching strategy
           await app.cache.clear();
 
-          // TODO delete received file
-          await app.files.deleteFile(receivedPath);
+          await app.files.deleteFile(`./storage/validated/${jobId}.csv`);
         });
     });
   });
 
-  setImmediate(() => {
-    // TODO
-  });
-
   // Insert data into db if already exists
   // TODO check if application type is ndjson
-  /*
   app.patch("/data", async function name(req, reply) {
     const data = await req.file();
 
     if (!data) {
-      reply.status(400).send(new Error("No file received."));
+      reply.code(400).send({
+        error: "No file received.",
+      });
       return;
     }
     const ftype: string = data.filename.split(".").slice(-1)[0];
@@ -150,14 +121,22 @@ export default async function (
     const jobId = await app.db.createJob();
     const collId = await app.db.createCollection();
     // temporarily store received data, for later validation of geojson content
-    const tmpStorage = path.join(
-      process.cwd(),
-      "storage",
-      "received",
-      jobId + ".ndjson"
-    );
 
-    await pump(data.file, createWriteStream(tmpStorage));
+    await app.validate
+      .validateData(data, collId, jobId, "UPDATE")
+      .then(async (valid) => {
+        if (!valid) {
+          app.db.updateJob(jobId, JobState.ERROR, collId, "Invalid GeoJSON.");
+          reply.code(400).send({
+            error: "Bad Request",
+            message: "Invalid GeoJSON.",
+          });
+          return;
+        } else {
+          console.log("valid");
+        }
+        reply.send(jobId);
+        /*
 
     setImmediate(() => {
       const outpath = `storage/validated/${jobId}.csv`;
@@ -180,8 +159,10 @@ export default async function (
       }
       reply.send({ jobId });
     });
+    */
+      });
   });
-*/
+
   /*
 // Insert data into db if not already exists
 // Todo implement put
