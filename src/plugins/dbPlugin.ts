@@ -27,7 +27,6 @@ interface PostgresDB {
     collId: string,
     Style: { minZoom: number; maxZoom: number }
   ): Promise<UpdateResult>;
-  //mvtDummyData(): unknown;
   createJob(): Promise<string>;
   updateJob(
     jobId: string,
@@ -53,7 +52,6 @@ interface PostgresDB {
     collId: string,
     featId: string
   ): Promise<Features | null>;
-
   getMVT(
     collId: string,
     z: number,
@@ -64,8 +62,7 @@ interface PostgresDB {
     name?: string
   ): Promise<MVTResponse[]>;
   testme(): Promise<any>;
-
-  patchAndGetDiff(patchPath: string): Promise<any>;
+  patchAndGetDiff(patchPath: string): Promise<string>;
 }
 
 /**
@@ -268,6 +265,9 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       return mvt_resp;
     },
     async patchAndGetDiff(patchPath: string) {
+      // start transaction
+      // stream validated data to db in tmp table
+
       console.log("trying", patchPath);
       const query =
         "COPY patch_features(feature_id, geom, properties, ft_collection) \
@@ -277,10 +277,56 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       const queryRunner = conn.createQueryRunner();
       const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
 
-      return await pipeline(
-        createReadStream(patchPath),
-        pgConn.query(copyQuery)
-      );
+      try {
+        await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
+      } catch (e: any) {
+        throw new Error("Error while streaming patch data to db", e);
+      }
+
+      // assert that all features in patch data are contained in existing features
+      //  else abort transaction
+      // calculate diff between existing and patch data
+      const patchDeltaPolyQuery = `
+            SELECT 
+              featId,
+              St_AsText(ST_Difference(g_union, g_inter)) as diffpoly         
+            FROM ( 
+              SELECT 
+                og.feature_id as featId,
+                ST_Union(og.geom, pg.geom) as g_union, 
+                ST_Intersection(og.geom, pg.geom) as g_inter
+              FROM features_test as og JOIN patch_features as pg
+              ON og.feature_id = pg.feature_id
+            ) as tmp
+            `;
+
+      let featId;
+      let diffPolys;
+      try {
+        const res = await queryRunner.query(patchDeltaPolyQuery);
+        featId = res[0].featid;
+        console.log("featId", featId);
+        // replace existing data with patch data
+        //  commit transaction
+
+        if (res.length === 0) {
+          console.log("no diff");
+          return;
+        }
+        diffPolys = res.map((r: { diffpoly: string }) => r.diffpoly);
+
+        return diffPolys;
+      } catch (err) {
+        await queryRunner.rollbackTransaction();
+        console.log(
+          "Error while trying to receive delta poly, rolling back transaction",
+          err
+        );
+      } finally {
+        // delete feature from patch table
+        await PatchFeatures.delete({ feature_id: featId });
+        await queryRunner.release();
+      }
     },
     //
   } satisfies PostgresDB);

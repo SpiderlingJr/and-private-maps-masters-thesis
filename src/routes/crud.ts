@@ -116,6 +116,28 @@ export default async function (
     const jobId = await app.db.createJob();
     const collId = await app.db.createCollection();
 
+    /*
+    await app.jobManager.run(
+      app.validate.validateData(data, collId, jobId, "UPDATE"),
+    )*/
+
+    /*
+    try {
+      const isValid = await app.validate.validateData(data, collId, jobId, "UPDATE");
+      if (!isValid) {
+        app.db.updateJob(jobId, JobState.ERROR, collId, "Invalid GeoJSON.");
+        reply.code(400).send({
+          error: "Bad Request",
+          message: "Invalid GeoJSON.",
+        });
+        return;
+      }
+    } catch (e) {
+      console.log("error", e);
+      await app.db.updateJob(jobId, JobState.ERROR, collId, e.message);
+    }
+    */
+
     await app.validate
       .validateData(data, collId, jobId, "UPDATE")
       .then(async (valid) => {
@@ -134,22 +156,15 @@ export default async function (
           collId,
           "File validated, patching..."
         );
-        console.log("fucked jobid?", jobId);
         // Patch logic here
-        await app.db
+        const diffPolys = await app.db
           .patchAndGetDiff(`./storage/validated/${jobId}.csv`)
           .catch((e) => {
             console.log("eeee", e);
           });
-        // start transaction
-        // stream validated data to db in tmp table
-        // assert that all features in patch data are contained in existing features
-        //  else abort transaction
-        // calculate diff between existing and patch data
-        // store diff in another tmp table and return diff id
-        // replace existing data with patch data
-        //  commit transaction
+
         // get diff polygons, rasterize their MVT
+        diffPolys;
         // remove diff mvts from cache, and reload them
 
         reply.send(jobId);

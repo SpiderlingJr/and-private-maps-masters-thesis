@@ -1,0 +1,1 @@
+{"type": "Feature", "geometry": {"type": "Polygon","coordinates": [[[10.3, 18.3],[11.3, 18.3],[11.3, 19.3],[10.3, 19.3],[10.3, 18.3] ]]},"properties": { "prop0": "value0","prop1": {"this": "that"}} }

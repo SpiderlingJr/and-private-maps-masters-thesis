@@ -1,0 +1,1 @@
+{"featId": "582db566-744e-43c2-98aa-0f0d42e0ee78", "type": "Feature", "geometry": {"type": "Polygon","coordinates": [[ [10, 18],[11, 18],[11, 19],[10, 19],[10, 18] ]]},"properties": { "prop0": "value0","prop1": {"this": "that"}} }
