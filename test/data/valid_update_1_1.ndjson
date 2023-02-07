@@ -1,0 +1,1 @@
+{"featId": "0cd14a54-fd30-46f4-8add-4b8980c27d14", "type": "Feature", "geometry": {"type": "Polygon","coordinates": [[[100.0, 0.0], [110.0, 0.0], [110.0, 1.0],[100.0, 1.0], [100.0, 0.0] ]]},"properties": { "name": "updated poly","prop1": {"this": "that"}} }
