@@ -4,11 +4,11 @@ import { createWriteStream } from "fs";
 import { PostGisConnection } from "./PostGisConnection.js";
 import { makeId } from "./MakeId.js";
 import { pipeline } from "stream";
-import { GeoJsonToCsvTransform } from "./transforms/GeoJsonToCsvTransform.js";
-import { GeoValidationTransform } from "./transforms/GeoValidationTransform.js";
-import { ReadlineTransform } from "./transforms/ReadLineTransform.js";
+import { GeoJsonToCsvTransform } from "../plugins/validation/transforms/GeoJsonToCsvTransform.js";
+import { GeoValidationTransform } from "../plugins/validation/transforms/GeoValidationTransform.js";
+import { ReadlineTransform } from "../plugins/validation/transforms/ReadLineTransform.js";
 import { JobState } from "../entities/jobs.js";
-import { PatchJsonToCsvTransform } from "./transforms/PatchJsonToCsvTransform.js";
+import { PatchJsonToCsvTransform } from "../plugins/validation/transforms/PatchJsonToCsvTransform.js";
 
 export class GeodataUpstreamHandler {
   postgis;

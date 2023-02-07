@@ -7,7 +7,7 @@ import pgcopy from "pg-copy-streams";
 import { pipeline } from "stream/promises";
 import { createReadStream } from "fs";
 import { DataSource, DeleteResult, UpdateResult } from "typeorm";
-import { TmpFeatures, Features } from "src/entities/features.js";
+import { TmpFeatures, Features, PatchFeatures } from "src/entities/features.js";
 import { Collections } from "src/entities/collections.js";
 import { Jobs, JobState } from "src/entities/jobs.js";
 import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner";
@@ -64,6 +64,8 @@ interface PostgresDB {
     name?: string
   ): Promise<MVTResponse[]>;
   testme(): Promise<any>;
+
+  patchAndGetDiff(patchPath: string): Promise<any>;
 }
 
 /**
@@ -89,7 +91,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         username: process.env.POSTGRES_USER,
         password: process.env.POSTGRES_PASSWORD,
         database: process.env.POSTGRES_DB,
-        entities: [Features, Collections, Jobs, TmpFeatures],
+        entities: [Features, Collections, Jobs, TmpFeatures, PatchFeatures],
         synchronize: true,
       });
 
@@ -225,7 +227,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
      */
     async updateCollection(collectionId: string) {
       const job_id = await this.createJob();
-
+      // TODO whats going on here?
       const collection = await this.getCollectionById(collectionId);
 
       return job_id;
@@ -264,6 +266,21 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       const mvt_resp = await Features.query(mvt_tmpl);
 
       return mvt_resp;
+    },
+    async patchAndGetDiff(patchPath: string) {
+      console.log("trying", patchPath);
+      const query =
+        "COPY patch_features(feature_id, geom, properties, ft_collection) \
+        FROM STDIN (FORMAT CSV, DELIMITER ';')";
+
+      const copyQuery = pgcopy.from(query);
+      const queryRunner = conn.createQueryRunner();
+      const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
+
+      return await pipeline(
+        createReadStream(patchPath),
+        pgConn.query(copyQuery)
+      );
     },
     //
   } satisfies PostgresDB);

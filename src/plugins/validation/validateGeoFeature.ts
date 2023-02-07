@@ -1,10 +1,8 @@
-import { createReadStream } from "fs";
-
 import { createWriteStream } from "fs";
 import { pipeline } from "stream";
-import { GeoJsonToCsvTransform } from "src/util/transforms/GeoJsonToCsvTransform.js";
-import { GeoValidationTransform } from "src/util/transforms/GeoValidationTransform.js";
-import { ReadlineTransform } from "src/util/transforms/ReadLineTransform.js";
+import { GeoJsonToCsvTransform } from "src/plugins/validation/transforms/GeoJsonToCsvTransform.js";
+import { GeoValidationTransform } from "src/plugins/validation/transforms/GeoValidationTransform.js";
+import { ReadlineTransform } from "src/plugins/validation/transforms/ReadLineTransform.js";
 import { MultipartFile } from "@fastify/multipart";
 
 /**
@@ -14,6 +12,7 @@ import { MultipartFile } from "@fastify/multipart";
  * @param colId Id of new collection
  * @returns
  */
+/*
 export function loadAndValidateGeoFeature(
   fpath: string,
   outpath: string,
@@ -50,6 +49,7 @@ export function loadAndValidateGeoFeature(
     });
   });
 }
+*/
 
 /**
  * Validation pipeline handling new data posted to server
@@ -67,7 +67,7 @@ export function validatePostData(
   const geoValidationTransform = new GeoValidationTransform();
   const jsonToCsvTransform = new GeoJsonToCsvTransform(colId, {}, "POST");
   const writeStream = createWriteStream(outpath);
-
+  console.log("WRITING TO", outpath);
   const validationPipeline = pipeline(
     data.file,
     readLineTransform,

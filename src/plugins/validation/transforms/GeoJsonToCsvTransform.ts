@@ -79,14 +79,13 @@ export class GeoJsonToCsvTransform extends Transform {
       const csv_featId = JSON.stringify(ndj.featId);
 
       const csv_line =
-        '"' +
+        csv_featId +
+        ';"' +
         csv_geom +
         '";"' +
         csv_properties +
         '";' +
         csv_colid +
-        '";' +
-        csv_featId +
         "\n";
 
       return csv_line;

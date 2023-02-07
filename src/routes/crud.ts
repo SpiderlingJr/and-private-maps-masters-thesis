@@ -3,10 +3,6 @@
 import { FastifyInstance } from "fastify";
 import { FastifyPluginOptions } from "fastify";
 import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
-import * as path from "path";
-import { pipeline } from "stream";
-import { promisify } from "util";
-import { createWriteStream } from "fs";
 
 import { collIdSchema } from "src/schema/httpRequestSchemas";
 import { JobState } from "src/entities/jobs";
@@ -18,7 +14,6 @@ export default async function (
   options;
 
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
-  const pump = promisify(pipeline);
 
   app.register(fastifyMultipart, {
     limits: {
@@ -97,7 +92,7 @@ export default async function (
 
   // Insert data into db if already exists
   // TODO check if application type is ndjson
-  app.patch("/data", async function name(req, reply) {
+  app.patch("/data", async function patchData(req, reply) {
     const data = await req.file();
 
     if (!data) {
@@ -120,7 +115,6 @@ export default async function (
     }
     const jobId = await app.db.createJob();
     const collId = await app.db.createCollection();
-    // temporarily store received data, for later validation of geojson content
 
     await app.validate
       .validateData(data, collId, jobId, "UPDATE")
@@ -132,34 +126,33 @@ export default async function (
             message: "Invalid GeoJSON.",
           });
           return;
-        } else {
-          console.log("valid");
         }
+        console.log("valid");
+        await app.db.updateJob(
+          jobId,
+          JobState.PENDING,
+          collId,
+          "File validated, patching..."
+        );
+        console.log("fucked jobid?", jobId);
+        // Patch logic here
+        await app.db
+          .patchAndGetDiff(`./storage/validated/${jobId}.csv`)
+          .catch((e) => {
+            console.log("eeee", e);
+          });
+        // start transaction
+        // stream validated data to db in tmp table
+        // assert that all features in patch data are contained in existing features
+        //  else abort transaction
+        // calculate diff between existing and patch data
+        // store diff in another tmp table and return diff id
+        // replace existing data with patch data
+        //  commit transaction
+        // get diff polygons, rasterize their MVT
+        // remove diff mvts from cache, and reload them
+
         reply.send(jobId);
-        /*
-
-    setImmediate(() => {
-      const outpath = `storage/validated/${jobId}.csv`;
-
-      // TODO
-      const validCsvPath = app.validate.validateGeoJson(
-        tmpStorage,
-        outpath,
-        jobId
-      );
-      if (!validCsvPath) {
-        reply.code(400).send({
-          error: "Bad Request",
-          message: "Invalid GeoJSON.",
-        });
-        return;
-      } else {
-        app.db.copyStreamCollection(collId);
-        //featureValidator.validateAndPatchGeoFeature(tmpStorage, jobId);
-      }
-      reply.send({ jobId });
-    });
-    */
       });
   });
 
