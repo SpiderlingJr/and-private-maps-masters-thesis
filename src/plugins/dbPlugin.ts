@@ -1,5 +1,3 @@
-/* Plugin handling database connections */
-
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import pgcopy from "pg-copy-streams";
@@ -13,6 +11,11 @@ import { Jobs, JobState } from "src/entities/jobs.js";
 import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner";
 import { styleSchema } from "../schema/httpRequestSchemas.js";
 
+export interface DeltaPolyPaths {
+  featid: string;
+  path: Array<number>;
+  geom: string;
+}
 interface MVTResponse {
   st_asmvt: string;
 }
@@ -43,6 +46,10 @@ interface PostgresDB {
 
   updateCollection(collectionId: string): Promise<string>;
   deleteCollection(collectionId: string): Promise<DeleteResult>;
+  /**
+   * Streams contents of validated csv file to db
+   * @param fpath
+   */
   copyStreamCollection(collectionPath: string): Promise<unknown>;
   getFeaturesByCollectionId(
     collId: string,
@@ -52,6 +59,7 @@ interface PostgresDB {
     collId: string,
     featId: string
   ): Promise<Features | null>;
+
   getMVT(
     collId: string,
     z: number,
@@ -62,10 +70,12 @@ interface PostgresDB {
     name?: string
   ): Promise<MVTResponse[]>;
   testme(): Promise<any>;
-  patchAndGetDiff(patchPath: string): Promise<string>;
+  patchAndGetDiff(patchPath: string): Promise<DeltaPolyPaths[]>;
 }
 
 /**
+ *  Plugin handling database communication
+
  * @param fastify Will be passed in if called from fastify.register()
  * @param options The options passed to fastify.register( ... , { **here** }). I.e. {strategy: 'redis'}
  */
@@ -224,7 +234,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
      */
     async updateCollection(collectionId: string) {
       const job_id = await this.createJob();
-      // TODO whats going on here?
+
       const collection = await this.getCollectionById(collectionId);
 
       return job_id;
@@ -268,7 +278,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       // start transaction
       // stream validated data to db in tmp table
 
-      console.log("trying", patchPath);
       const query =
         "COPY patch_features(feature_id, geom, properties, ft_collection) \
         FROM STDIN (FORMAT CSV, DELIMITER ';')";
@@ -280,13 +289,16 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
       } catch (e: any) {
-        throw new Error("Error while streaming patch data to db", e);
+        throw new Error("Error while streaming patch data to db");
       }
 
       // assert that all features in patch data are contained in existing features
       //  else abort transaction
       // calculate diff between existing and patch data
-      const patchDeltaPolyQuery = `
+      const deltaPolyQuery = `
+        SELECT tmp2.featid as featId, 
+        (ST_DumpPoints(diffpoly)).path as path, 
+        ST_AsText((ST_DumpPoints(diffpoly)).geom) as geom FROM (
             SELECT 
               featId,
               St_AsText(ST_Difference(g_union, g_inter)) as diffpoly         
@@ -298,30 +310,46 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
               FROM features_test as og JOIN patch_features as pg
               ON og.feature_id = pg.feature_id
             ) as tmp
+          ) as tmp2
             `;
 
       let featId;
-      let diffPolys;
       try {
-        const res = await queryRunner.query(patchDeltaPolyQuery);
-        featId = res[0].featid;
-        console.log("featId", featId);
-        // replace existing data with patch data
-        //  commit transaction
+        const deltaPolys: DeltaPolyPaths[] = await queryRunner.query(
+          deltaPolyQuery
+        );
+        featId = deltaPolys[0].featid;
 
-        if (res.length === 0) {
-          console.log("no diff");
-          return;
+        if (!deltaPolys) {
+          throw new Error("Error while calculating delta polygons");
         }
-        diffPolys = res.map((r: { diffpoly: string }) => r.diffpoly);
+        /* TODO After finishing implementing this, uncomment! This updates the existing features with the new data
+        const updateResult = await queryRunner.query(
+          `UPDATE features_test 
+            SET geom = patch_features.geom, 
+                properties = patch_features.properties, 
+                ft_collection = patch_features.ft_collection
+          FROM patch_features
+          WHERE features_test.feature_id = patch_features.feature_id`
+        );
+        const rowsUpdated = updateResult[1];
+        console.log("rows updated: ", rowsUpdated);
+        */
 
-        return diffPolys;
+        /* if (deltaPolys.length === 0) {
+          console.log("no diff");
+
+        } */
+        console.log("deltaPolys", deltaPolys);
+
+        return deltaPolys;
       } catch (err) {
         await queryRunner.rollbackTransaction();
         console.log(
           "Error while trying to receive delta poly, rolling back transaction",
           err
         );
+        throw err;
       } finally {
         // delete feature from patch table
         await PatchFeatures.delete({ feature_id: featId });

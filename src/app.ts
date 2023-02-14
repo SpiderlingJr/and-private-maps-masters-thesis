@@ -6,8 +6,8 @@ import closeWithGrace from "close-with-grace";
 //import { fileURLToPath } from "url";
 //import { dirname, join } from "path";
 
-import cachePlugin from "./plugins/cachePlugin.js";
-import dbPlugin from "./plugins/dbPlugin.js";
+import cachePlugin from "./plugins/cachePlugin";
+import dbPlugin from "./plugins/dbPlugin";
 
 import helperRoutes from "./routes/helpers";
 import ogcRoutes from "./routes/ogc";
@@ -15,8 +15,9 @@ import cacheRoutes from "./routes/cache";
 import crudRoutes from "./routes/crud";
 import styleRoutes from "./routes/style";
 import mvtRoutes from "./routes/mvt";
-import validatorPlugin from "./plugins/validatorPlugin.js";
-import filesPlugin from "./plugins/filesPlugin.js";
+import validatorPlugin from "./plugins/validatorPlugin";
+import filesPlugin from "./plugins/filesPlugin";
+import cacheEvictionPlugin from "./plugins/cacheEvictionPlugin";
 
 // Instantiate Fastify with some config
 const app = fastify({
@@ -60,6 +61,7 @@ app.register(cachePlugin, {
 app.register(dbPlugin);
 app.register(validatorPlugin);
 app.register(filesPlugin);
+app.register(cacheEvictionPlugin);
 
 // Register routes
 app.register(helperRoutes);

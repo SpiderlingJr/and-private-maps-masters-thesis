@@ -116,14 +116,19 @@ export default async function (
     const jobId = await app.db.createJob();
     const collId = await app.db.createCollection();
 
+    reply.send(jobId);
     /*
     await app.jobManager.run(
       app.validate.validateData(data, collId, jobId, "UPDATE"),
     )*/
 
-    /*
     try {
-      const isValid = await app.validate.validateData(data, collId, jobId, "UPDATE");
+      const isValid = await app.validate.validateData(
+        data,
+        collId,
+        jobId,
+        "UPDATE"
+      );
       if (!isValid) {
         app.db.updateJob(jobId, JobState.ERROR, collId, "Invalid GeoJSON.");
         reply.code(400).send({
@@ -132,43 +137,30 @@ export default async function (
         });
         return;
       }
-    } catch (e) {
+      await app.db.updateJob(
+        jobId,
+        JobState.PENDING,
+        collId,
+        "File validated, patching..."
+      );
+      // Patch logic here
+      const diffPolys = await app.db
+        .patchAndGetDiff(`./storage/validated/${jobId}.csv`)
+        .catch((e) => {
+          console.log("eeee", e);
+        });
+
+      if (diffPolys) {
+        await app.evictor.evictDiffFromCache(diffPolys);
+      }
+
+      // get diff polygons, rasterize their MVT
+      console.log("diffPolys", diffPolys);
+      // remove diff mvts from cache, and reload them
+    } catch (e: any) {
       console.log("error", e);
       await app.db.updateJob(jobId, JobState.ERROR, collId, e.message);
     }
-    */
-
-    await app.validate
-      .validateData(data, collId, jobId, "UPDATE")
-      .then(async (valid) => {
-        if (!valid) {
-          app.db.updateJob(jobId, JobState.ERROR, collId, "Invalid GeoJSON.");
-          reply.code(400).send({
-            error: "Bad Request",
-            message: "Invalid GeoJSON.",
-          });
-          return;
-        }
-        console.log("valid");
-        await app.db.updateJob(
-          jobId,
-          JobState.PENDING,
-          collId,
-          "File validated, patching..."
-        );
-        // Patch logic here
-        const diffPolys = await app.db
-          .patchAndGetDiff(`./storage/validated/${jobId}.csv`)
-          .catch((e) => {
-            console.log("eeee", e);
-          });
-
-        // get diff polygons, rasterize their MVT
-        diffPolys;
-        // remove diff mvts from cache, and reload them
-
-        reply.send(jobId);
-      });
   });
 
   /*
