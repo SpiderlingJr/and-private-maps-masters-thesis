@@ -4,9 +4,8 @@ import { MultipartFile } from "@fastify/multipart";
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import path from "path";
-import { UpdateStrategy } from "src/util/transforms/GeoJsonToCsvTransform";
+import { UpdateStrategy } from "src/plugins/validation/transforms/GeoJsonToCsvTransform";
 import {
-  loadAndValidateGeoFeature,
   validatePatchData,
   validatePostData,
 } from "./validation/validateGeoFeature";
@@ -17,12 +16,6 @@ declare module "fastify" {
   }
 }
 interface GeoValidator {
-  validateGeoJson(
-    fpath: string,
-    outpath: string,
-    colId: string
-  ): Promise<boolean>;
-
   validateData(
     data: MultipartFile,
     colId: string,
@@ -37,11 +30,6 @@ interface GeoValidator {
  */
 const validatorPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate("validate", {
-    async validateGeoJson(fpath: string, outpath: string, colId: string) {
-      console.log("validateGeoJson");
-      const valid = await loadAndValidateGeoFeature(fpath, outpath, colId);
-      return valid;
-    },
     /**
      * Runs the passed file through the validation process.
      *
