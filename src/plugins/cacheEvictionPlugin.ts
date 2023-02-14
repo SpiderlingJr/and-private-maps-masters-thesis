@@ -2,7 +2,6 @@
  * This plugin is responsible for evicting tiles from cache after they have been updated.
  * It implements logic to find the contents of the cache that are stale due to a change in the database and evicts them.
  */
-
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { DeltaPolyPaths } from "./dbPlugin";
@@ -14,13 +13,10 @@ import {
 
 declare module "fastify" {
   interface FastifyInstance {
-    evictor: Evictor; // fastify.decorate('cache', { ... }); makes this available
+    evictor: Evictor;
   }
 }
 
-/**
- * Implement this interface to provide a cache strategy
- */
 interface Evictor {
   /**
    * Method to evict tiles from cache that are stale due to a change in the database
@@ -44,12 +40,9 @@ const cacheEvictionPlugin: FastifyPluginAsync = async (fastify, options) => {
     }
   }
   fastify.decorate("evictor", {
-    async evictDiffFromCache(deltaPolys: DeltaPolyPaths[]) {
+    async evictDiffFromCache(deltaPolys: DeltaPolyPaths[], maxZoom = 14) {
       console.log("evicting from cache");
       console.log("deltaPolys", deltaPolys);
-
-      // TODO handle the zoom level
-      const maxZoom = 8;
 
       const points = parsePolyPoints(deltaPolys);
       const mvts = rasterize(points, maxZoom);
@@ -72,6 +65,6 @@ const cacheEvictionPlugin: FastifyPluginAsync = async (fastify, options) => {
       await runEviction(mvtStrings, parents);
       return;
     },
-  } satisfies Evictor); // makes sure that the interface is implemented
+  } satisfies Evictor);
 };
 export default fp(cacheEvictionPlugin);
