@@ -2,10 +2,6 @@ import { fastify } from "fastify";
 import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import closeWithGrace from "close-with-grace";
 
-//import autoload from "@fastify/autoload";
-//import { fileURLToPath } from "url";
-//import { dirname, join } from "path";
-
 import cachePlugin from "./plugins/cachePlugin";
 import dbPlugin from "./plugins/dbPlugin";
 
@@ -18,41 +14,62 @@ import mvtRoutes from "./routes/mvt";
 import validatorPlugin from "./plugins/validatorPlugin";
 import filesPlugin from "./plugins/filesPlugin";
 import cacheEvictionPlugin from "./plugins/cacheEvictionPlugin";
+import { TransportMultiOptions } from "pino";
 
 // Instantiate Fastify with some config
+
+declare module "pino" {
+  //eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace pino {
+    interface BaseLogger {
+      metric: LogFn;
+    }
+  }
+}
+
+const customLevels = {
+  info: 30,
+  debug: 35,
+  warn: 40,
+  error: 50,
+  fatal: 60,
+  metric: 99,
+};
+
+const loggerTransports = {
+  targets: [
+    {
+      target: "pino-pretty",
+      options: {
+        customLevels: customLevels,
+        translateTime: "HH:MM:ss Z",
+        ignore: "pid,hostname",
+      },
+      level: "info",
+    },
+    {
+      target: "pino-pretty",
+      options: {
+        customLevels: customLevels,
+        translateTime: "HH:MM:ss Z",
+        ignore: "pid,hostname",
+        colorize: false,
+        destination: "logs/metric.log",
+      },
+      level: "metric",
+    },
+  ],
+  levels: customLevels,
+} satisfies TransportMultiOptions;
+
 const app = fastify({
   logger: {
+    customLevels: customLevels,
+    useOnlyCustomLevels: true,
     transport:
-      process.env.NODE_ENV !== "production"
-        ? {
-            target: "pino-pretty",
-            options: {
-              translateTime: "HH:MM:ss Z",
-              ignore: "pid,hostname",
-            },
-          }
-        : undefined,
-    level:
-      process.env.DEBUG != null
-        ? "debug"
-        : process.env.NODE_ENV === "test"
-        ? "error"
-        : "info",
+      process.env.NODE_ENV !== "production" ? loggerTransports : undefined,
   },
 }).withTypeProvider<TypeBoxTypeProvider>();
-
-//TODO How to get autoload to work? fails to import cache.
-/*
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-app.register(autoload, {
-  dir: join(__dirname, "./routes"),
-});
-
-app.register(autoload, {
-  dir: join(__dirname, "./plugins"),
-});
-*/
 
 // Register plugins
 app.register(cachePlugin, {
