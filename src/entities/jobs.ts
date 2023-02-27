@@ -13,7 +13,7 @@ export enum JobState {
   ERROR = "error",
 }
 
-@Entity("jobs_test")
+@Entity("jobs")
 export class Jobs extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   job_id: string;

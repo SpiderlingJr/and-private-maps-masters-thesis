@@ -11,7 +11,7 @@ import {
 import { Geometry } from "geojson";
 import { Collections } from "src/entities/collections.js";
 
-@Entity("features_test")
+@Entity("features")
 export class Features extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   feature_id: string;
@@ -23,7 +23,7 @@ export class Features extends BaseEntity {
   @JoinColumn({ name: "ft_collection" })
   ft_collection: Collections;
 
-  @Column({ type: "geometry" })
+  @Column({ type: "geometry", srid: 4326 })
   geom: Geometry;
 
   @Column({ type: "jsonb", nullable: true })
