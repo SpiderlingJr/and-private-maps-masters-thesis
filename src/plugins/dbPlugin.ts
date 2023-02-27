@@ -180,7 +180,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
      */
     async copyStreamCollection(collectionPath: string) {
       const query =
-        "COPY features_test(geom, properties, ft_collection) FROM STDIN (FORMAT CSV, DELIMITER ';')";
+        "COPY features(geom, properties, ft_collection) FROM STDIN (FORMAT CSV, DELIMITER ';')";
       const copyQuery = pgcopy.from(query);
       const queryRunner = conn.createQueryRunner();
       const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
@@ -255,10 +255,11 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       if (extent < 1) throw new Error("Extent must be > 1");
 
       const buffer_fp = buffer * 1.0;
-      const feature_table = "features_test";
+      const feature_table = "features";
 
       const mvt_tmpl = `WITH mvtgeom AS (\
-      SELECT ST_AsMVTGeom(geom, 
+      SELECT ST_AsMVTGeom(
+       ST_Transform(ST_SetSRID(geom,4326), 3857), 
         ST_TileEnvelope(
           ${z},${x},${y}), 
           extent => ${extent},  
@@ -266,7 +267,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         AS geom, properties \
         FROM ${feature_table} \
         WHERE geom 
-          && ST_TileEnvelope(${z},${x},${y}, margin=> (${buffer_fp}/${extent})) \
+          && ST_TileEnvelope(0,0,0, margin=> (${buffer_fp}/${extent})) \
         AND ft_collection = '${collId}') \
       SELECT ST_AsMVT(mvtgeom.*, '${name}') FROM mvtgeom;`;
 
@@ -307,7 +308,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
                 og.feature_id as featId,
                 ST_Union(og.geom, pg.geom) as g_union, 
                 ST_Intersection(og.geom, pg.geom) as g_inter
-              FROM features_test as og JOIN patch_features as pg
+              FROM features as og JOIN patch_features as pg
               ON og.feature_id = pg.feature_id
             ) as tmp
           ) as tmp2
@@ -325,12 +326,12 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         }
         /* TODO After finishing implementing this, uncomment! This updates the existing features with the new data
         const updateResult = await queryRunner.query(
-          `UPDATE features_test 
+          `UPDATE features 
             SET geom = patch_features.geom, 
                 properties = patch_features.properties, 
                 ft_collection = patch_features.ft_collection
           FROM patch_features
-          WHERE features_test.feature_id = patch_features.feature_id`
+          WHERE features.feature_id = patch_features.feature_id`
         );
         const rowsUpdated = updateResult[1];
         console.log("rows updated: ", rowsUpdated);
