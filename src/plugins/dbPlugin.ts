@@ -290,6 +290,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
       } catch (e: any) {
+        console.log(e);
         throw new Error("Error while streaming patch data to db");
       }
 
@@ -299,7 +300,8 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       const deltaPolyQuery = `
         SELECT tmp2.featid as featId, 
         (ST_DumpPoints(diffpoly)).path as path, 
-        ST_AsText((ST_DumpPoints(diffpoly)).geom) as geom FROM (
+        ST_AsText(ST_Transform(ST_SetSRID((ST_DumpPoints(diffpoly)).geom, 4326),3857))
+            as geom FROM (
             SELECT 
               featId,
               St_AsText(ST_Difference(g_union, g_inter)) as diffpoly         

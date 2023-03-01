@@ -40,11 +40,24 @@ const cacheEvictionPlugin: FastifyPluginAsync = async (fastify, options) => {
     }
   }
   fastify.decorate("evictor", {
-    async evictDiffFromCache(deltaPolys: DeltaPolyPaths[], maxZoom = 14) {
-      console.log("evicting from cache");
-      console.log("deltaPolys", deltaPolys);
+    async evictDiffFromCache(deltaPolys: DeltaPolyPaths[], maxZoom = 18) {
+      //console.log("evicting from cache");
+      //console.log("deltaPolys", deltaPolys);
 
       const points = parsePolyPoints(deltaPolys);
+      fastify.log.debug("Delta Poly Points");
+      console.log(points);
+
+      for (let i = 0; i < points["points"].length; i++) {
+        const p = points["points"][i];
+        fastify.log.debug(`[${p[0]}, ${p[1]}]`);
+        if (
+          i != points["points"].length - 1 &&
+          points["ppath"][i][0] < points["ppath"][i + 1][0]
+        ) {
+          fastify.log.debug("NEW POLY");
+        }
+      }
       const mvts = rasterize(points, maxZoom);
 
       const fmtMvts = new Set<string>();
@@ -54,8 +67,22 @@ const cacheEvictionPlugin: FastifyPluginAsync = async (fastify, options) => {
 
       const parents = findMvtParents(maxZoom, fmtMvts);
 
-      console.log("mvts", mvts);
-      console.log("parents", parents);
+      fastify.log.debug("mvts", mvts);
+      /*mvts.forEach((m) => {
+        fastify.log.debug(`${m[0]}/${m[1]}/${m[2]}`);
+      });
+      */
+      fastify.log.debug("Evicting Tiles", parents);
+      let count = 0;
+      parents.forEach((m) => {
+        const mSplit = m.split("/");
+        count++;
+        fastify.log.debug(`${mSplit[0]}/${mSplit[1]}/${mSplit[2]}`);
+        if (count > 100) {
+          fastify.log.debug(`... ${parents.size - count} more`);
+          return;
+        }
+      });
 
       const mvtStrings = new Set<string>();
       for (const m of mvts) {
