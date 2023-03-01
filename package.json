@@ -47,6 +47,7 @@
     "@fastify/type-provider-typebox": "^2.4.0",
     "@prisma/client": "4.9.0",
     "@sinclair/typebox": "^0.25.21",
+    "@turf/turf": "^6.5.0",
     "@types/form-data": "^2.5.0",
     "@types/geojson": "^7946.0.10",
     "@types/jsonstream": "^0.8.30",
