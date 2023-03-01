@@ -16,8 +16,6 @@ import filesPlugin from "./plugins/filesPlugin";
 import cacheEvictionPlugin from "./plugins/cacheEvictionPlugin";
 import { TransportMultiOptions } from "pino";
 
-// Instantiate Fastify with some config
-
 declare module "pino" {
   //eslint-disable-next-line @typescript-eslint/no-namespace
   namespace pino {
@@ -27,7 +25,8 @@ declare module "pino" {
   }
 }
 
-const customLevels = {
+const customLogLevels = {
+  trace: 10,
   info: 30,
   debug: 35,
   warn: 40,
@@ -41,30 +40,32 @@ const loggerTransports = {
     {
       target: "pino-pretty",
       options: {
-        customLevels: customLevels,
+        customLevels: customLogLevels,
         translateTime: "HH:MM:ss Z",
         ignore: "pid,hostname",
       },
-      level: "info",
+      level: "debug",
     },
     {
       target: "pino-pretty",
       options: {
-        customLevels: customLevels,
+        customLevels: customLogLevels,
         translateTime: "HH:MM:ss Z",
         ignore: "pid,hostname",
         colorize: false,
-        destination: "logs/metric.log",
+        destination: `logs/${new Date()
+          .toISOString()
+          .substring(0, 10)}.metrics.log`,
       },
       level: "metric",
     },
   ],
-  levels: customLevels,
+  levels: customLogLevels,
 } satisfies TransportMultiOptions;
 
 const app = fastify({
   logger: {
-    customLevels: customLevels,
+    customLevels: customLogLevels,
     useOnlyCustomLevels: true,
     transport:
       process.env.NODE_ENV !== "production" ? loggerTransports : undefined,
