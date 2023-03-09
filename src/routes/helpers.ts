@@ -30,13 +30,6 @@ export default async function (
     }
   );
 
-  app.get("/somePolys", async function (request, reply) {
-    const aa = await app.cache.set("test", "test");
-    const somepolys = await app.db.testme();
-
-    reply.send(somepolys);
-  });
-
   app.get(
     "/job/:jobId",
     {
