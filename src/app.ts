@@ -14,6 +14,7 @@ import mvtRoutes from "./routes/mvt";
 import validatorPlugin from "./plugins/validatorPlugin";
 import filesPlugin from "./plugins/filesPlugin";
 import cacheEvictionPlugin from "./plugins/cacheEvictionPlugin";
+import performanceMeterPlugin from "./plugins/performanceMeterPlugin";
 import { TransportMultiOptions } from "pino";
 
 declare module "pino" {
@@ -77,17 +78,18 @@ app.register(cachePlugin, {
   strategy: process.env.STRATEGY as "memory" | "redis" | undefined,
 });
 app.register(dbPlugin);
-app.register(validatorPlugin);
 app.register(filesPlugin);
+app.register(validatorPlugin);
 app.register(cacheEvictionPlugin);
+app.register(performanceMeterPlugin);
 
 // Register routes
-app.register(helperRoutes);
+app.register(mvtRoutes);
 app.register(ogcRoutes);
-app.register(cacheRoutes);
 app.register(crudRoutes);
 app.register(styleRoutes);
-app.register(mvtRoutes);
+app.register(cacheRoutes);
+app.register(helperRoutes);
 
 const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
   if (err) {

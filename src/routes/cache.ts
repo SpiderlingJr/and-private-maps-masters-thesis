@@ -26,6 +26,7 @@ export default async function (
       //const mvt = await mvtCache.getTile(`${z}/${x}/${y}`);
       const mvt = await app.cache.get(`${z}/${x}/${y}`);
       if (mvt) {
+        console.trace(`Cache hit for ${z}/${x}/${y}`);
         reply.code(200).send(mvt);
       } else {
         reply.code(404);

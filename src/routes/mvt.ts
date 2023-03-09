@@ -33,6 +33,7 @@ export default async function (
    * Requests the geometry and property data of a given collection, and returns a VMT protobuf object
    * containing the feature data of requested zoom levels and x/y coordinates.
    */
+
   app.get(
     "/collections/:collId/:z/:x/:y.vector.pbf",
     {
@@ -42,6 +43,7 @@ export default async function (
     },
     async function (request, reply) {
       const { collId, z, x, y } = request.params;
+      console.debug("Requesting tile", collId, z, x, y);
       const zxy_key = `${z}/${x}/${y}`;
       const { minZoom, maxZoom } = await app.db.getCollectionZoomLevel(collId);
 
@@ -53,16 +55,20 @@ export default async function (
       }
       // Try fetching requested tile from cache
       const cachedMvt = await app.cache.get(zxy_key);
-
       if (cachedMvt === "") {
         reply.code(204).send();
       }
+
       if (cachedMvt) {
+        app.log.trace(`Tile ${zxy_key} already cached.`);
         //const mvt = Buffer.from(cachedMvt, "base64");
         //reply.send(mvt);
+        console.log(`Cache hit for ${z}/${x}/${y}`);
+        console.log(cachedMvt);
         reply.send(cachedMvt);
       } else {
         // tile not in cache, request from db and cache.
+        app.log.trace(`Requesting Tile ${zxy_key} from db`);
         const res = await app.db.getMVT(collId, z, x, y);
         const mvt = res[0].st_asmvt;
         // Store new tile in cache

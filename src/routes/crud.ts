@@ -46,6 +46,8 @@ export default async function (
 
     const jobId = await app.db.createJob();
     const colId = await app.db.createCollection();
+    const timer = app.performanceMeter.startTimer(`postJob-${jobId}`);
+
     await app.validate.validateData(data, colId, jobId).then(async (valid) => {
       if (!valid) {
         app.db.updateJob(jobId, JobState.ERROR, colId, "Invalid GeoJSON.");
@@ -80,12 +82,14 @@ export default async function (
             error: "Internal Server Error",
             message: "Could not upload validated file:\n" + e.message,
           });
+          timer.stop(false);
         })
         .finally(async () => {
           // TODO change this to caching strategy
           await app.cache.clear();
 
           await app.files.deleteFile(`./storage/validated/${jobId}.csv`);
+          timer.stop(true);
         });
     });
   });
@@ -144,8 +148,16 @@ export default async function (
         "File validated, patching..."
       );
       // Patch logic here
+
+      const diffPolyTimer = app.performanceMeter.startTimer(
+        `diffPoly-cid-${collId}`
+      );
       const diffPolys = await app.db
         .patchAndGetDiff(`./storage/validated/${jobId}.csv`)
+        .then((res) => {
+          diffPolyTimer.stop(true);
+          return res;
+        })
         .catch((e) => {
           console.log("eeee", e);
         });
@@ -155,7 +167,7 @@ export default async function (
       }
 
       // get diff polygons, rasterize their MVT
-      console.log("diffPolys", diffPolys);
+      //console.log("diffPolys", diffPolys);
       // remove diff mvts from cache, and reload them
     } catch (e: any) {
       console.log("error", e);

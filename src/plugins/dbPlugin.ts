@@ -69,7 +69,6 @@ interface PostgresDB {
     buffer?: number,
     name?: string
   ): Promise<MVTResponse[]>;
-  testme(): Promise<any>;
   patchAndGetDiff(patchPath: string): Promise<DeltaPolyPaths[]>;
 }
 
@@ -114,9 +113,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
   conn = await connectDB();
 
   fastify.decorate("db", {
-    async testme() {
-      return await conn.query("SELECT * FROM somepolys");
-    },
     async createJob() {
       const job = Jobs.create({});
       await job.save();
@@ -287,10 +283,13 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       const queryRunner = conn.createQueryRunner();
       const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
 
+      const copyTimer = fastify.performanceMeter.startTimer("copyStreamPatch");
       try {
         await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
+        copyTimer.stop(true);
       } catch (e: any) {
         console.log(e);
+        copyTimer.stop(false);
         throw new Error("Error while streaming patch data to db");
       }
 
@@ -316,11 +315,15 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           ) as tmp2
             `;
 
+      const deltaPolyTimer =
+        fastify.performanceMeter.startTimer("deltaPolyQuery");
       let featId;
       try {
         const deltaPolys: DeltaPolyPaths[] = await queryRunner.query(
           deltaPolyQuery
         );
+        deltaPolyTimer.stop(true);
+
         featId = deltaPolys[0].featid;
 
         if (!deltaPolys) {
@@ -352,6 +355,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           "Error while trying to receive delta poly, rolling back transaction",
           err
         );
+        deltaPolyTimer.stop(false);
         throw err;
       } finally {
         // delete feature from patch table
