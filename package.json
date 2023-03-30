@@ -5,8 +5,8 @@
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
-    "test": "STRATEGY=redis c8 tap",
-    "test-inmemory": "STRATEGY=memory c8 tap",
+    "test": "export $(cat .env); STRATEGY=redis c8 tap",
+    "test-inmemory": "export $(cat .env); STRATEGY=memory c8 tap",
     "start": "node --loader=@esbuild-kit/esm-loader src/index.ts",
     "dev": "export $(cat .env); STRATEGY=redis DEBUG='info' nodemon --exec \"node --loader=@esbuild-kit/esm-loader\" src/index.ts",
     "dev-redis": "export $(cat .env); STRATEGY=redis nodemon --exec \"node --loader=@esbuild-kit/esm-loader\" src/index.ts",
