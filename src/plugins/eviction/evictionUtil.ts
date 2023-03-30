@@ -5,6 +5,12 @@ interface PolyDescription {
   ppath: number[][];
 }
 
+/**
+ * Converts a point from EPSG:3857 to EPSG:4326
+ * @param x  x coordinate in EPSG:3857
+ * @param y  y coordinate in EPSG:3857
+ * @returns  [lon, lat] in EPSG:4326
+ */
 function convert3857To4326(x: number, y: number): number[] {
   const lon = (x / 20037508.34) * 180;
   const lat = (y / 20037508.34) * 180;
@@ -19,6 +25,8 @@ function convert3857To4326(x: number, y: number): number[] {
 /**
  * Takes the output of ST_DumpPoints and returns an array of point pairs
  * intended as input for a line rasterization algorithm i.e Bresenham
+ * @param poly  Array of points in EPSG:3857
+ *
  */
 export function parsePolyPoints(poly: DeltaPolyPaths[]): PolyDescription {
   const points = poly.map((p) => p.geom);
@@ -88,7 +96,6 @@ export function bresenham(x0: number, y0: number, x1: number, y1: number) {
         points.push([x, y - sy]);
         //points.push([x, y + sy]);
       }
-
       // Also push a point moving in the x direction
       //points.push([x0 - sx, y0]);
     }

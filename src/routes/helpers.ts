@@ -1,7 +1,7 @@
-import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { Type } from "@sinclair/typebox";
-import { FastifyPluginOptions } from "fastify";
 import { FastifyInstance } from "fastify";
+import { FastifyPluginOptions } from "fastify";
+import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 
 import { jobIdSchema } from "../schema/httpRequestSchemas.js";
 
