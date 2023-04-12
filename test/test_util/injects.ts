@@ -1,4 +1,3 @@
-import LightMyRequest from "light-my-request";
 import { JobState } from "../../src/entities/jobs";
 import { app } from "../../src/app.js";
 
@@ -13,7 +12,7 @@ async function waitForUploadJobCompletion(
   jobId: string,
   interval = 1000,
   maxRetries = 5
-): Promise<Response> {
+) {
   function delay(time) {
     return new Promise((resolve) => setTimeout(resolve, time));
   }
@@ -44,11 +43,11 @@ async function waitForUploadJobCompletion(
         });
     });
 
-  const jobResponse = retryOperation(
+  const jobResponse: Promise<any> = retryOperation(
     getJobState,
     interval,
     maxRetries
-  ) as Promise<Response>;
+  );
   return jobResponse;
 }
 
