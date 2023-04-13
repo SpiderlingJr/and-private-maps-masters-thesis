@@ -6,10 +6,10 @@ import { createReadStream } from "fs";
 import { waitForUploadJobCompletion } from "./test_util/injects.js";
 
 test("general suite", async (t) => {
+  t.teardown(process.exit);
   t.beforeEach(async () => {
     // TODO Establish test data for subsequent tests
   });
-  t.teardown(process.exit);
 
   t.test("sub1: standard workflow", async (standardWorkflowTest) => {
     standardWorkflowTest.plan(8);
@@ -27,7 +27,11 @@ test("general suite", async (t) => {
       payload: form,
       headers: form.getHeaders(),
     });
-    standardWorkflowTest.equal(uploadResponse.statusCode, 200);
+    standardWorkflowTest.equal(
+      uploadResponse.statusCode,
+      200,
+      "uploading a valid ndjson file should return 200"
+    );
 
     // get collection id of uploaded file, wait for completion if necessary
     const jobId = uploadResponse.body;
@@ -39,7 +43,11 @@ test("general suite", async (t) => {
       method: "GET",
       url: `/collections`,
     });
-    standardWorkflowTest.equal(collectionInfoReponse.statusCode, 200);
+    standardWorkflowTest.equal(
+      collectionInfoReponse.statusCode,
+      200,
+      "get collections should return 200"
+    );
 
     // assert the recently published collection is listed in the collections
     const collectionInfo = JSON.parse(collectionInfoReponse.body);
@@ -53,7 +61,7 @@ test("general suite", async (t) => {
     standardWorkflowTest.equal(
       true,
       collectionExists,
-      `cid ${collectionId} should be in collections, but is not`
+      `cid ${collectionId} should exist in collections after upload`
     );
 
     // TODO try to get data for that new collection
@@ -62,7 +70,11 @@ test("general suite", async (t) => {
       method: "GET",
       url: `/collections/${collectionId}`,
     });
-    standardWorkflowTest.equal(collectionResponse.statusCode, 200);
+    standardWorkflowTest.equal(
+      collectionResponse.statusCode,
+      200,
+      `get collection ${collectionId} should return 200`
+    );
 
     // try setting a valid style
     const styleResponse = await app.inject({
@@ -81,7 +93,7 @@ test("general suite", async (t) => {
     standardWorkflowTest.equal(
       styleResponse.statusCode,
       200,
-      "set valid styleset response -> ok"
+      "setting a valid style should return 200"
     );
 
     // try receiving mvt data out of bounds of style
@@ -90,8 +102,16 @@ test("general suite", async (t) => {
       method: "GET",
       url: `/collections/${collectionId}/${invalidZoomLevel}/2/3.vector.pbf`,
     });
-    standardWorkflowTest.equal(oobMvtResponse.statusCode, 200);
-    standardWorkflowTest.equal(oobMvtResponse.body.length, 0);
+    standardWorkflowTest.equal(
+      oobMvtResponse.statusCode,
+      200,
+      "getting mvt data out of bounds of style should return 200"
+    );
+    standardWorkflowTest.equal(
+      oobMvtResponse.body.length,
+      0,
+      "getting mvt data out of bounds of style should return an empty response"
+    );
 
     // try receiving data in bounds of style
     const okZoom = 8;
@@ -99,14 +119,21 @@ test("general suite", async (t) => {
       method: "GET",
       url: `/collections/${collectionId}/${okZoom}/1/0.vector.pbf`,
     });
-    standardWorkflowTest.equal(okMvtResponse.statusCode, 200);
-
+    standardWorkflowTest.equal(
+      okMvtResponse.statusCode,
+      200,
+      "getting mvt data in bounds of style should return 200"
+    );
     standardWorkflowTest.afterEach(async () => {
       const delResponse = await app.inject({
         method: "DELETE",
         url: `/collections/${collectionId}`,
       });
-      t.equal(delResponse.statusCode, 200);
+      t.equal(
+        delResponse.statusCode,
+        200,
+        `deleting collection ${collectionId} should return 200`
+      );
 
       // TODO check if the collection is actually deleted
     });
@@ -116,7 +143,7 @@ test("general suite", async (t) => {
     "sub2: requests on non-parametric routes",
     async (invariantRouteTest) => {
       invariantRouteTest.test(
-        'requests the "/randomRoute" route',
+        'requests the non-existing "/randomRoute" route',
         async (randomRouteTest) => {
           const response = await app.inject({
             method: "GET",
@@ -124,18 +151,21 @@ test("general suite", async (t) => {
             headers: {
               "content-type": "application/json",
             },
-            //query: { foo: "1", bar: "baaa" },
           });
           randomRouteTest.equal(
             response.statusCode,
             400,
-            "returns a status code of 400"
+            "requesting a non-existing route should return 400"
           );
-          randomRouteTest.same(JSON.parse(response.body), {
-            statusCode: 400,
-            error: "Bad Request",
-            message: "querystring must have required property 'foo'",
-          });
+          randomRouteTest.same(
+            JSON.parse(response.body),
+            {
+              statusCode: 400,
+              error: "Bad Request",
+              message: "querystring must have required property 'foo'",
+            },
+            "requesting a non-existing route should return a helpful error message"
+          );
         }
       );
 
@@ -152,7 +182,7 @@ test("general suite", async (t) => {
           landingPageTest.equal(
             response.statusCode,
             200,
-            "returns a status code of 200"
+            "requesting the landing page should return 200"
           );
         }
       );
@@ -164,7 +194,11 @@ test("general suite", async (t) => {
             method: "GET",
             url: "/collections",
           });
-          listCollectionsTest.equal(response.statusCode, 200);
+          listCollectionsTest.equal(
+            response.statusCode,
+            200,
+            "requesting the list of collections should return 200"
+          );
         }
       );
     }
@@ -180,26 +214,46 @@ test("general suite", async (t) => {
             method: "GET",
             url: "/collections/c8effd27-d965-472b-9940-47e2122a9ece",
           });
-          nonExistingCollectionIdTest.equal(response.statusCode, 404);
-          nonExistingCollectionIdTest.same(JSON.parse(response.body), {
-            //statusCode: 404,
-            error: "Not Found",
-            message: `No collection with id c8effd27-d965-472b-9940-47e2122a9ece`,
-          });
+          nonExistingCollectionIdTest.equal(
+            response.statusCode,
+            404,
+            "requesting a non-existing collection should return 404"
+          );
+          nonExistingCollectionIdTest.same(
+            JSON.parse(response.body),
+            {
+              //statusCode: 404,
+              error: "Not Found",
+              message: `No collection with id c8effd27-d965-472b-9940-47e2122a9ece`,
+            },
+            "requesting a non-existing collection should return a helpful error message"
+          );
         }
       );
 
       invalidDataTest.test(
         'request "/collections/:cid" route with invalid collection id',
         async (malformedCollectionIdTest) => {
+          const invalidCollId = "27-d965-472b-9940-47e2122a9ecd";
           const response = await app.inject({
             method: "GET",
-            url: "/collections/27-d965-472b-9940-47e2122a9ecd",
+            url: `/collections/${invalidCollId}`,
           });
-          malformedCollectionIdTest.equal(response.statusCode, 500);
-          malformedCollectionIdTest.same(JSON.parse(response.body), {
-            error: "Internal Server Error",
-          });
+          // TODO make this return 400, needs to be fixed in the server
+          malformedCollectionIdTest.equal(
+            response.statusCode,
+            400,
+            "requesting a collection with an invalid id should return 500"
+          );
+          // TODO fix the error message to be in line with a 400 response
+          malformedCollectionIdTest.same(
+            JSON.parse(response.body),
+            {
+              error: "Bad Request",
+              message: `Invalid Syntax for UUID ${invalidCollId}`,
+            },
+            "requesting a collection with an invalid id should return a helpful error message"
+          );
         }
       );
 
@@ -210,22 +264,32 @@ test("general suite", async (t) => {
             method: "POST",
             url: "/data",
           });
-          invalidMultipartPostTest.equal(response.statusCode, 406);
-          invalidMultipartPostTest.same(JSON.parse(response.body), {
-            statusCode: 406,
-            code: "FST_INVALID_MULTIPART_CONTENT_TYPE",
-            error: "Not Acceptable",
-            message: "the request is not multipart",
-          });
+          invalidMultipartPostTest.equal(
+            response.statusCode,
+            406,
+            "requesting a non-multipart post should return 406"
+          );
+          invalidMultipartPostTest.same(
+            JSON.parse(response.body),
+            {
+              statusCode: 406,
+              code: "FST_INVALID_MULTIPART_CONTENT_TYPE",
+              error: "Not Acceptable",
+              message: "the request is not multipart",
+            },
+            "requesting a non-multipart post should return a helpful error message"
+          );
         }
       );
 
       invalidDataTest.test(
         "try setting a valid style for non-existing collection",
         async (validStyleNonExistingCollectionTest) => {
+          const nonExistingCollectionId =
+            "7555e416-9a11-445b-b614-f12c1185ed63";
           const response = await app.inject({
             method: "POST",
-            url: "/collections/7555e416-9a11-445b-b614-f12c1185ed63/style",
+            url: `/collections/${nonExistingCollectionId}/style`,
             headers: {
               "content-type": "application/json",
             },
@@ -236,11 +300,19 @@ test("general suite", async (t) => {
               },
             },
           });
-          validStyleNonExistingCollectionTest.equal(response.statusCode, 404);
-          validStyleNonExistingCollectionTest.same(JSON.parse(response.body), {
-            error: "Not Found",
-            message: `No collection with id 7555e416-9a11-445b-b614-f12c1185ed63`,
-          });
+          validStyleNonExistingCollectionTest.equal(
+            response.statusCode,
+            404,
+            "setting a valid style for a non-existing collection should return 404"
+          );
+          validStyleNonExistingCollectionTest.same(
+            JSON.parse(response.body),
+            {
+              error: "Not Found",
+              message: `No collection with id ${nonExistingCollectionId}`,
+            },
+            "setting a valid style for a non-existing collection should return a helpful error message"
+          );
         }
       );
     }
@@ -262,7 +334,11 @@ test("general suite", async (t) => {
       payload: form,
       headers: form.getHeaders(),
     });
-    cacheTest.equal(uploadResponse.statusCode, 200);
+    cacheTest.equal(
+      uploadResponse.statusCode,
+      200,
+      "uploading a valid ndjson file should return 200"
+    );
 
     // get collection id of uploaded file, wait for completion if necessary
     const jobId = uploadResponse.body;
@@ -287,10 +363,18 @@ test("general suite", async (t) => {
             },
           },
         });
-        minZoomBTmaxZoomTest.equal(response.statusCode, 400);
-        minZoomBTmaxZoomTest.same(JSON.parse(response.body), {
-          error: "minZoom cannot be greater than maxZoom",
-        });
+        minZoomBTmaxZoomTest.equal(
+          response.statusCode,
+          400,
+          "setting a minZoom level bigger than maxZoom should return 400"
+        );
+        minZoomBTmaxZoomTest.same(
+          JSON.parse(response.body),
+          {
+            error: "minZoom cannot be greater than maxZoom",
+          },
+          "setting a minZoom level bigger than maxZoom should return a helpful error message"
+        );
       }
     );
 
@@ -311,7 +395,11 @@ test("general suite", async (t) => {
             },
           },
         });
-        t.equal(response.statusCode, 400);
+        t.equal(
+          response.statusCode,
+          400,
+          "setting a minZoom level exceeding 22 should return 400"
+        );
         t.same(JSON.parse(response.body), {
           statusCode: 400,
           error: "Bad Request",
@@ -333,7 +421,11 @@ test("general suite", async (t) => {
           method: "GET",
           url: cache_request,
         });
-        t.equal(cachePreRequest.statusCode, 404);
+        t.equal(
+          cachePreRequest.statusCode,
+          404,
+          "cache shouldnt have an entry at that position on loadup"
+        );
 
         const response = await app.inject({
           method: "GET",

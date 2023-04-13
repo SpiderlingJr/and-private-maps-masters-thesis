@@ -205,9 +205,22 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       return feat;
     },
     async getCollectionById(colId: string) {
-      const coll = await Collections.findOne({ where: { coll_id: colId } });
-
-      return coll;
+      try {
+        const coll = await Collections.findOneOrFail({
+          where: { coll_id: colId },
+        });
+        return coll;
+      } catch (err: any) {
+        const errAsJson = JSON.parse(JSON.stringify(err));
+        console.log(errAsJson);
+        if (errAsJson.code === "22P02") {
+          throw new Error("22P02", { cause: "Invalid Syntax for UUID" });
+        }
+        if (errAsJson.message.startsWith("Could not find any entity of type")) {
+          throw new Error("404", { cause: "No such collection" });
+        }
+        throw err;
+      }
     },
     async getCollectionZoomLevel(
       collId: string
@@ -224,7 +237,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       return { minZoom: minZoom, maxZoom: maxZoom };
     },
     /**
-     *
+     * ! Whats going on here?
      * @param collectionId updates a collection
      * @returns job_id of update job
      */
@@ -250,8 +263,8 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
     ) {
       if (extent < 1) throw new Error("Extent must be > 1");
 
-      const buffer_fp = buffer * 1.0;
-      const feature_table = "features";
+      const bufferFloat = buffer * 1.0;
+      const featureTable = "features";
 
       const mvt_tmpl = `WITH mvtgeom AS (\
       SELECT ST_AsMVTGeom(
@@ -261,15 +274,15 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           extent => ${extent},  
           buffer => ${buffer}) 
         AS geom, properties \
-        FROM ${feature_table} \
+        FROM ${featureTable} \
         WHERE geom 
-          && ST_TileEnvelope(0,0,0, margin=> (${buffer_fp}/${extent})) \
+          && ST_TileEnvelope(0,0,0, margin=> (${bufferFloat}/${extent})) \
         AND ft_collection = '${collId}') \
       SELECT ST_AsMVT(mvtgeom.*, '${name}') FROM mvtgeom;`;
 
-      const mvt_resp = await Features.query(mvt_tmpl);
+      const mvtResponse = await Features.query(mvt_tmpl);
 
-      return mvt_resp;
+      return mvtResponse;
     },
     async patchAndGetDiff(patchPath: string) {
       // start transaction
@@ -329,7 +342,8 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         if (!deltaPolys) {
           throw new Error("Error while calculating delta polygons");
         }
-        /* TODO After finishing implementing this, uncomment! This updates the existing features with the new data
+        /* 
+        TODO After finishing implementing this, uncomment! This updates the existing features with the new data
         const updateResult = await queryRunner.query(
           `UPDATE features 
             SET geom = patch_features.geom, 
@@ -363,7 +377,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         await queryRunner.release();
       }
     },
-    //
   } satisfies PostgresDB);
 
   fastify.addHook("onClose", async () => {
