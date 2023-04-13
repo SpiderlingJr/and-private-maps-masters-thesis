@@ -212,7 +212,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         return coll;
       } catch (err: any) {
         const errAsJson = JSON.parse(JSON.stringify(err));
-        console.log(errAsJson);
         if (errAsJson.code === "22P02") {
           throw new Error("22P02", { cause: "Invalid Syntax for UUID" });
         }
@@ -301,7 +300,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
         copyTimer.stop(true);
       } catch (e: any) {
-        console.log(e);
         copyTimer.stop(false);
         throw new Error("Error while streaming patch data to db");
       }
@@ -360,7 +358,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           console.log("no diff");
 
         } */
-        console.log("deltaPolys", deltaPolys);
 
         return deltaPolys;
       } catch (err) {
