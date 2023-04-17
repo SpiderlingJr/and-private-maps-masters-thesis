@@ -126,11 +126,7 @@ export default async function generateRandomGeoFeatures(
     }
   );
 
-  writeAsNdjson(
-    //mutatedFeaturesWithId,
-    randomFeatures,
-    patchable1Path
-  );
+  writeAsNdjson(mutatedFeaturesWithId, patchable1Path);
   // Store original data as ndjson, with featId and collectionId
   writeAsNdjson(originalFeaturesWithId, patchable2Path);
 
