@@ -225,12 +225,12 @@ app.put("/data", async function name(req, reply) {
       const jobId = await app.db.createJob();
       await app.db
         .deleteCollection(collId)
-        .then(async (response) => {
+        .then(async () => {
           await app.db.updateJob(
             jobId,
             JobState.FINISHED,
             collId,
-            response.raw
+            "Collection deleted"
           );
         })
         .catch(async (err) => {
