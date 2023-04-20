@@ -110,9 +110,21 @@ export default async function (
           }
         })
         .catch((err) => {
-          reply.code(500).send({
-            error: "Internal Server Error",
-          });
+          if (err.message === "22P02") {
+            reply.code(400).send({
+              error: "Bad Request",
+              message: err.cause + " " + collId,
+            });
+          } else if (err.message === "404") {
+            reply.code(404).send({
+              error: "Not Found",
+              message: `No collection with id ${collId}`,
+            });
+          } else {
+            reply.code(500).send({
+              error: err.message,
+            });
+          }
         });
     }
   );
