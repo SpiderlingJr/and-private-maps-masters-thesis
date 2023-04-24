@@ -4,7 +4,7 @@ import pgcopy from "pg-copy-streams";
 
 import { pipeline } from "stream/promises";
 import { createReadStream } from "fs";
-import { DataSource, DeleteResult, UpdateResult } from "typeorm";
+import { DataSource, DeleteResult, In, UpdateResult } from "typeorm";
 import { TmpFeatures, Features, PatchFeatures } from "src/entities/features.js";
 import { Collections } from "src/entities/collections.js";
 import { Jobs, JobState } from "src/entities/jobs.js";
@@ -241,6 +241,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
      * @returns job_id of update job
      */
     async updateCollection(collectionId: string) {
+      // TODO: What is this
       const job_id = await this.createJob();
 
       const collection = await this.getCollectionById(collectionId);
@@ -293,6 +294,8 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
 
       const copyQuery = pgcopy.from(query);
       const queryRunner = conn.createQueryRunner();
+      queryRunner.startTransaction();
+
       const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
 
       const copyTimer = fastify.performanceMeter.startTimer("copyStreamPatch");
@@ -301,10 +304,11 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         copyTimer.stop(true);
       } catch (e: any) {
         copyTimer.stop(false);
-        throw new Error("Error while streaming patch data to db");
+        console.error(e);
+        throw e;
       }
 
-      // assert that all features in patch data are contained in existing features
+      // TODO assert that all features in patch data are contained in existing features
       //  else abort transaction
       // calculate diff between existing and patch data
       const deltaPolyQuery = `
@@ -328,20 +332,19 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
 
       const deltaPolyTimer =
         fastify.performanceMeter.startTimer("deltaPolyQuery");
-      let featId;
+      let featIds;
       try {
         const deltaPolys: DeltaPolyPaths[] = await queryRunner.query(
           deltaPolyQuery
         );
         deltaPolyTimer.stop(true);
 
-        featId = deltaPolys[0].featid;
+        featIds = deltaPolys.map((d) => d.featid);
 
         if (!deltaPolys) {
           throw new Error("Error while calculating delta polygons");
         }
-        /* 
-        TODO After finishing implementing this, uncomment! This updates the existing features with the new data
+
         const updateResult = await queryRunner.query(
           `UPDATE features 
             SET geom = patch_features.geom, 
@@ -350,19 +353,15 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           FROM patch_features
           WHERE features.feature_id = patch_features.feature_id`
         );
-        const rowsUpdated = updateResult[1];
-        console.log("rows updated: ", rowsUpdated);
-        */
 
-        /* if (deltaPolys.length === 0) {
-          console.log("no diff");
-
-        } */
-
+        if (!updateResult) {
+          throw new Error("Error while updating features");
+        }
+        await queryRunner.commitTransaction();
         return deltaPolys;
       } catch (err) {
         await queryRunner.rollbackTransaction();
-        console.log(
+        fastify.log.error(
           "Error while trying to receive delta poly, rolling back transaction",
           err
         );
@@ -370,8 +369,16 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         throw err;
       } finally {
         // delete feature from patch table
-        await PatchFeatures.delete({ feature_id: featId });
         await queryRunner.release();
+        if (featIds) {
+          await PatchFeatures.delete({ feature_id: In(featIds) }).then(
+            (res) => {
+              fastify.log.debug(
+                `Deleted ${res.affected} features from patch_features`
+              );
+            }
+          );
+        }
       }
     },
   } satisfies PostgresDB);
