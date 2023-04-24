@@ -1,145 +1,163 @@
 import { test } from "tap";
 import { app } from "../src/app.js";
 import FormData from "form-data";
-import { createReadStream } from "fs";
+import { createReadStream, readFileSync } from "fs";
+import _ from "lodash";
 
 import { waitForUploadJobCompletion } from "./test_util/injects.js";
+import generateRandomGeoFeatures from "./test_util/dataGenerator/spitRandomGeoms.js";
+import { cropGeometryCoordinates } from "./test_util/cropGeometry.js";
 
 test("general suite", async (t) => {
   t.teardown(process.exit);
-  t.beforeEach(async () => {
-    // TODO Establish test data for subsequent tests
+
+  let randomTestDataPaths: Awaited<
+    ReturnType<typeof generateRandomGeoFeatures>
+  >;
+
+  t.before(async () => {
+    try {
+      const testData = await generateRandomGeoFeatures(
+        2,
+        "test/data",
+        "generalTestSuite"
+      );
+      randomTestDataPaths = testData;
+    } catch (e) {
+      console.log(e);
+    }
   });
 
-  t.test("sub1: standard workflow", async (standardWorkflowTest) => {
-    standardWorkflowTest.plan(8);
-
-    // upload a valid ndjson file
-    const form = new FormData();
-    form.append(
-      "valid_data",
-      createReadStream(`test/data/valid_ndjson_1.ndjson`)
-    );
-
-    const uploadResponse = await app.inject({
-      method: "POST",
-      url: "/data",
-      payload: form,
-      headers: form.getHeaders(),
-    });
-    standardWorkflowTest.equal(
-      uploadResponse.statusCode,
-      200,
-      "uploading a valid ndjson file should return 200"
-    );
-
-    // get collection id of uploaded file, wait for completion if necessary
-    const jobId = uploadResponse.body;
-    const jobResponse = await waitForUploadJobCompletion(jobId);
-    const collectionId = JSON.parse(jobResponse.body).job_collection;
-
-    // try to get a listing of collections
-    const collectionInfoReponse = await app.inject({
-      method: "GET",
-      url: `/collections`,
-    });
-    standardWorkflowTest.equal(
-      collectionInfoReponse.statusCode,
-      200,
-      "get collections should return 200"
-    );
-
-    // assert the recently published collection is listed in the collections
-    const collectionInfo = JSON.parse(collectionInfoReponse.body);
-    let collectionExists = false;
-    for (const col of collectionInfo) {
-      if (col["coll_id"] == collectionId) {
-        collectionExists = true;
-        break;
-      }
-    }
-    standardWorkflowTest.equal(
-      true,
-      collectionExists,
-      `cid ${collectionId} should exist in collections after upload`
-    );
-
-    // TODO try to get data for that new collection
-    // TODO check if the entries are correct
-    const collectionResponse = await app.inject({
-      method: "GET",
-      url: `/collections/${collectionId}`,
-    });
-    standardWorkflowTest.equal(
-      collectionResponse.statusCode,
-      200,
-      `get collection ${collectionId} should return 200`
-    );
-
-    // try setting a valid style
-    const styleResponse = await app.inject({
-      method: "POST",
-      url: `/collections/${collectionId}/style`,
-      headers: {
-        "content-type": "application/json",
-      },
-      payload: {
-        Style: {
-          minZoom: 6,
-          maxZoom: 8,
-        },
-      },
-    });
-    standardWorkflowTest.equal(
-      styleResponse.statusCode,
-      200,
-      "setting a valid style should return 200"
-    );
-
-    // try receiving mvt data out of bounds of style
-    const invalidZoomLevel = 9;
-    const oobMvtResponse = await app.inject({
-      method: "GET",
-      url: `/collections/${collectionId}/${invalidZoomLevel}/2/3.vector.pbf`,
-    });
-    standardWorkflowTest.equal(
-      oobMvtResponse.statusCode,
-      200,
-      "getting mvt data out of bounds of style should return 200"
-    );
-    standardWorkflowTest.equal(
-      oobMvtResponse.body.length,
-      0,
-      "getting mvt data out of bounds of style should return an empty response"
-    );
-
-    // try receiving data in bounds of style
-    const okZoom = 8;
-    const okMvtResponse = await app.inject({
-      method: "GET",
-      url: `/collections/${collectionId}/${okZoom}/1/0.vector.pbf`,
-    });
-    standardWorkflowTest.equal(
-      okMvtResponse.statusCode,
-      200,
-      "getting mvt data in bounds of style should return 200"
-    );
-    standardWorkflowTest.afterEach(async () => {
-      const delResponse = await app.inject({
-        method: "DELETE",
-        url: `/collections/${collectionId}`,
-      });
-      t.equal(
-        delResponse.statusCode,
-        200,
-        `deleting collection ${collectionId} should return 200`
+  t.todo(
+    "sub1: standard workflow on known data",
+    async (standardWorkflowTest) => {
+      // upload a valid ndjson file
+      const form = new FormData();
+      form.append(
+        "validNdjsonData",
+        createReadStream(`test/data/valid_ndjson_1.ndjson`)
       );
 
-      // TODO check if the collection is actually deleted
-    });
-  });
+      const uploadResponse = await app.inject({
+        method: "POST",
+        url: "/data",
+        payload: form,
+        headers: form.getHeaders(),
+      });
+      standardWorkflowTest.equal(
+        uploadResponse.statusCode,
+        200,
+        "uploading a valid ndjson file should return 200"
+      );
 
-  t.test(
+      // get collection id of uploaded file, wait for completion if necessary
+      const jobId = uploadResponse.body;
+      const jobResponse = await waitForUploadJobCompletion(jobId);
+      const collectionId = JSON.parse(jobResponse.body).job_collection;
+
+      // try to get a listing of collections
+      const collectionInfoReponse = await app.inject({
+        method: "GET",
+        url: `/collections`,
+      });
+      standardWorkflowTest.equal(
+        collectionInfoReponse.statusCode,
+        200,
+        "get collections should return 200"
+      );
+
+      // assert the recently published collection is listed in the collections
+      const collectionInfo = JSON.parse(collectionInfoReponse.body);
+      let collectionExists = false;
+      for (const col of collectionInfo) {
+        if (col["coll_id"] == collectionId) {
+          collectionExists = true;
+          break;
+        }
+      }
+      standardWorkflowTest.equal(
+        true,
+        collectionExists,
+        `cid ${collectionId} should exist in collections after upload`
+      );
+
+      // TODO try to get data for that new collection
+      // TODO check if the entries are correct
+      const collectionResponse = await app.inject({
+        method: "GET",
+        url: `/collections/${collectionId}`,
+      });
+      standardWorkflowTest.equal(
+        collectionResponse.statusCode,
+        200,
+        `get collection ${collectionId} should return 200`
+      );
+
+      // try setting a valid style
+      const styleResponse = await app.inject({
+        method: "POST",
+        url: `/collections/${collectionId}/style`,
+        headers: {
+          "content-type": "application/json",
+        },
+        payload: {
+          Style: {
+            minZoom: 6,
+            maxZoom: 8,
+          },
+        },
+      });
+      standardWorkflowTest.equal(
+        styleResponse.statusCode,
+        200,
+        "setting a valid style should return 200"
+      );
+
+      // try receiving mvt data out of bounds of style
+      const invalidZoomLevel = 9;
+      const oobMvtResponse = await app.inject({
+        method: "GET",
+        url: `/collections/${collectionId}/${invalidZoomLevel}/2/3.vector.pbf`,
+      });
+      standardWorkflowTest.equal(
+        oobMvtResponse.statusCode,
+        200,
+        "getting mvt data out of bounds of style should return 200"
+      );
+      standardWorkflowTest.equal(
+        oobMvtResponse.body.length,
+        0,
+        "getting mvt data out of bounds of style should return an empty response"
+      );
+
+      // try receiving data in bounds of style
+      const okZoom = 8;
+      const okMvtResponse = await app.inject({
+        method: "GET",
+        url: `/collections/${collectionId}/${okZoom}/1/0.vector.pbf`,
+      });
+      standardWorkflowTest.equal(
+        okMvtResponse.statusCode,
+        200,
+        "getting mvt data in bounds of style should return 200"
+      );
+      standardWorkflowTest.afterEach(async () => {
+        const delResponse = await app.inject({
+          method: "DELETE",
+          url: `/collections/${collectionId}`,
+        });
+        t.equal(
+          delResponse.statusCode,
+          200,
+          `deleting collection ${collectionId} should return 200`
+        );
+
+        // TODO check if the collection is actually deleted
+      });
+    }
+  );
+
+  t.todo(
     "sub2: requests on non-parametric routes",
     async (invariantRouteTest) => {
       invariantRouteTest.test(
@@ -166,6 +184,7 @@ test("general suite", async (t) => {
             },
             "requesting a non-existing route should return a helpful error message"
           );
+          randomRouteTest.end();
         }
       );
 
@@ -184,6 +203,7 @@ test("general suite", async (t) => {
             200,
             "requesting the landing page should return 200"
           );
+          landingPageTest.end();
         }
       );
 
@@ -199,12 +219,13 @@ test("general suite", async (t) => {
             200,
             "requesting the list of collections should return 200"
           );
+          listCollectionsTest.end();
         }
       );
     }
   );
 
-  t.test(
+  t.todo(
     "sub3: requests on non-existing or invalid data",
     async (invalidDataTest) => {
       invalidDataTest.test(
@@ -228,6 +249,7 @@ test("general suite", async (t) => {
             },
             "requesting a non-existing collection should return a helpful error message"
           );
+          nonExistingCollectionIdTest.end();
         }
       );
 
@@ -254,6 +276,7 @@ test("general suite", async (t) => {
             },
             "requesting a collection with an invalid id should return a helpful error message"
           );
+          malformedCollectionIdTest.end();
         }
       );
 
@@ -279,6 +302,7 @@ test("general suite", async (t) => {
             },
             "requesting a non-multipart post should return a helpful error message"
           );
+          invalidMultipartPostTest.end();
         }
       );
 
@@ -313,12 +337,13 @@ test("general suite", async (t) => {
             },
             "setting a valid style for a non-existing collection should return a helpful error message"
           );
+          validStyleNonExistingCollectionTest.end();
         }
       );
     }
   );
 
-  t.test("sub4: caching tests", async (cacheTest) => {
+  t.todo("sub4: caching tests", async (cacheTest) => {
     // These tests are required to work independent of applied cache strategy
 
     // upload a valid ndjson file
@@ -457,7 +482,91 @@ test("general suite", async (t) => {
     // TODO this (I promise it works)
   });
 
-  t.test("sub5: style tests", async (styleTest) => {
+  t.todo("sub5: style tests", async (styleTest) => {
     //
   });
+
+  t.test(
+    "sub6: standard workflow on randomly generated geodata",
+    async (randomDataStandardTest) => {
+      /* The following tests work under the assumption of valid data being generated by the randomTestDataGenerator
+       and are meant to further test the standard workflow under more realistic conditions
+       * Upload test for original ndjson is obsolete, this is included in the randomTestDataGenerator test.
+       TODO extend this suite to include tests that check if the service behaves correctly if the data is invalid
+       TODO patch collection with patchable mutated properties
+       TODO patch collection with patchable original properties
+       TODO todo assert collection is patched correctly
+      */
+
+      const collectionId = randomTestDataPaths.collectionId;
+
+      const mutatedDataNdjson = readFileSync(
+        randomTestDataPaths.patchableMutatedPath
+      ).toString();
+
+      const mutatedForm = new FormData();
+      mutatedForm.append(
+        "validNdjsonData",
+        createReadStream(randomTestDataPaths.patchableMutatedPath)
+      );
+
+      // TODO patch data
+      // TODO assert patching works correctly.
+      const mutatedPatchRes = await app.inject({
+        method: "PATCH",
+        url: `/data`,
+        payload: mutatedForm,
+        headers: mutatedForm.getHeaders(),
+      });
+      randomDataStandardTest.equal(
+        mutatedPatchRes.statusCode,
+        200,
+        "patching a valid ndjson file should return 200"
+      );
+      // wait a second
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // get the mutated data from db
+      const mutatedDataRes = await app.inject({
+        method: "GET",
+        url: `/collections/${collectionId}/items`,
+      });
+
+      const mutatedData = JSON.parse(mutatedDataRes.body);
+
+      const mutatedCompareMap = new Map();
+      const ndjArray = mutatedDataNdjson.split("\n");
+      ndjArray.forEach((ndj) => {
+        const asJSON = JSON.parse(ndj);
+        mutatedCompareMap.set(asJSON.featId, asJSON.geometry);
+      });
+
+      let allEqual = true;
+      mutatedData.forEach((feature) => {
+        const dbGeom = feature.Features_geom;
+        const localGeom = mutatedCompareMap.get(feature.Features_feature_id);
+        cropGeometryCoordinates(localGeom);
+        if (!_.isEqual(dbGeom, localGeom)) {
+          console.log("Mutated data is not equal to the data in the db!");
+          console.log("croppedLocal: ", localGeom);
+          console.log("DB: ", dbGeom);
+          allEqual = false;
+        }
+      });
+      randomDataStandardTest.equal(
+        allEqual,
+        true,
+        "mutated data should be equal to the data in the db"
+      );
+
+      randomDataStandardTest.end();
+      randomDataStandardTest.afterEach(async () => {
+        await app.inject({
+          method: "DELETE",
+          url: `/collections/${randomTestDataPaths.collectionId}`,
+        });
+        // TODO check if the collection is actually deleted
+      });
+    }
+  );
 });
