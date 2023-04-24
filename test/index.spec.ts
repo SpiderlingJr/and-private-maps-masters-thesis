@@ -28,7 +28,7 @@ test("general suite", async (t) => {
     }
   });
 
-  t.todo(
+  t.test(
     "sub1: standard workflow on known data",
     async (standardWorkflowTest) => {
       // upload a valid ndjson file
@@ -157,7 +157,7 @@ test("general suite", async (t) => {
     }
   );
 
-  t.todo(
+  t.test(
     "sub2: requests on non-parametric routes",
     async (invariantRouteTest) => {
       invariantRouteTest.test(
@@ -225,7 +225,7 @@ test("general suite", async (t) => {
     }
   );
 
-  t.todo(
+  t.test(
     "sub3: requests on non-existing or invalid data",
     async (invalidDataTest) => {
       invalidDataTest.test(
@@ -343,7 +343,7 @@ test("general suite", async (t) => {
     }
   );
 
-  t.todo("sub4: caching tests", async (cacheTest) => {
+  t.test("sub4: caching tests", async (cacheTest) => {
     // These tests are required to work independent of applied cache strategy
 
     // upload a valid ndjson file
