@@ -4,7 +4,7 @@ import FormData from "form-data";
 import { createReadStream, readFileSync } from "fs";
 import _ from "lodash";
 
-import { waitForUploadJobCompletion } from "./test_util/injects.js";
+import { awaitJobCompletion } from "./test_util/injects.js";
 import generateRandomGeoFeatures from "./test_util/dataGenerator/spitRandomGeoms.js";
 import { cropGeometryCoordinates } from "./test_util/cropGeometry.js";
 
@@ -52,7 +52,7 @@ test("general suite", async (t) => {
 
       // get collection id of uploaded file, wait for completion if necessary
       const jobId = uploadResponse.body;
-      const jobResponse = await waitForUploadJobCompletion(jobId);
+      const jobResponse = await awaitJobCompletion(jobId);
       const collectionId = JSON.parse(jobResponse.body).job_collection;
 
       // try to get a listing of collections
@@ -367,10 +367,8 @@ test("general suite", async (t) => {
 
     // get collection id of uploaded file, wait for completion if necessary
     const jobId = uploadResponse.body;
-    const jobResponse = await waitForUploadJobCompletion(jobId);
+    const jobResponse = await awaitJobCompletion(jobId);
     const cid = JSON.parse(jobResponse.body).job_collection;
-    console.log("cid: ", cid);
-
     // TODO move this to a seperate test subsuite
     cacheTest.test(
       "try setting a minZoom level bigger than maxZoom on an existing collection",
@@ -510,8 +508,6 @@ test("general suite", async (t) => {
         createReadStream(randomTestDataPaths.patchableMutatedPath)
       );
 
-      // TODO patch data
-      // TODO assert patching works correctly.
       const mutatedPatchRes = await app.inject({
         method: "PATCH",
         url: `/data`,
@@ -524,7 +520,7 @@ test("general suite", async (t) => {
         "patching a valid ndjson file should return 200"
       );
       // wait a second
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await awaitJobCompletion(mutatedPatchRes.body);
 
       // get the mutated data from db
       const mutatedDataRes = await app.inject({
