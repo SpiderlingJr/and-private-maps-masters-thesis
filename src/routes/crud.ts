@@ -159,16 +159,22 @@ export default async function (
           return res;
         })
         .catch((e) => {
-          console.log("eeee", e);
+          console.log("Error during patching: ", e);
+        })
+        .finally(async () => {
+          await app.files.deleteFile(`./storage/validated/${jobId}.csv`);
         });
+
+      await app.db.updateJob(
+        jobId,
+        JobState.FINISHED,
+        collId,
+        "Patch finished."
+      );
 
       if (diffPolys) {
         await app.evictor.evictDiffFromCache(diffPolys);
       }
-
-      // get diff polygons, rasterize their MVT
-      //console.log("diffPolys", diffPolys);
-      // remove diff mvts from cache, and reload them
     } catch (e: any) {
       console.log("error", e);
       await app.db.updateJob(jobId, JobState.ERROR, collId, e.message);
