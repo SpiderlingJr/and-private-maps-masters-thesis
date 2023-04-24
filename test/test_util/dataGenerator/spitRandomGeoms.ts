@@ -56,17 +56,21 @@ export default async function generateRandomGeoFeatures(
     storeDir,
     `${genId}_g_${NUM_FEATURES}f.geojson`
   );
-  const patchable1Path = path.join(
+  const patchableMutatedPath = path.join(
     storeDir,
     `${genId}_1_${NUM_FEATURES}f.ndjson`
   );
-  const patchable2Path = path.join(
+  const patchableOriginalPath = path.join(
     storeDir,
     `${genId}_2_${NUM_FEATURES}f.ndjson`
   );
 
   // generate numFeatures random features
-  const randomFeatures = rg.generateRandomGeometry(numFeatures);
+  const randomFeatures = rg.generateRandomGeometry(
+    numFeatures,
+    {},
+    { geomType: "Point" }
+  );
   // mutate them
   const mutatedFeatures = rg.mutateGeometry(randomFeatures, {
     uniformMutation: true,
@@ -126,15 +130,15 @@ export default async function generateRandomGeoFeatures(
     }
   );
 
-  writeAsNdjson(mutatedFeaturesWithId, patchable1Path);
+  writeAsNdjson(mutatedFeaturesWithId, patchableMutatedPath);
   // Store original data as ndjson, with featId and collectionId
-  writeAsNdjson(originalFeaturesWithId, patchable2Path);
+  writeAsNdjson(originalFeaturesWithId, patchableOriginalPath);
 
   return {
     collectionId,
     geoJsonFilePath: allFeaturesGeojsonPath,
     originalFeaturesPath,
-    patchable1Path,
-    patchable2Path,
+    patchableMutatedPath,
+    patchableOriginalPath,
   };
 }
