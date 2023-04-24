@@ -17,16 +17,11 @@ test("random generator", async (t) => {
     .catch((err) => {
       console.log("Error in random generator test");
       t.fail(err);
+      t.end();
     });
 
-  if (!colId) {
-    t.fail("No collection id");
-    t.end();
-  }
-
-  const deleteResponse = await app.inject({
+  await app.inject({
     method: "DELETE",
     url: `/collections/${colId}`,
   });
-  console.log("deleteResponse", deleteResponse);
 });
