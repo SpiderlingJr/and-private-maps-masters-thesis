@@ -1,7 +1,0 @@
-"{""type"":""Point"",""coordinates"":[103,0.5]}";"{""valid"":""testdata""}";"d1df240e-ab55-4d3b-a59e-2daac18f1ad2"
-"{""type"":""Point"",""coordinates"":[[102,0],[103,1],[104,0],[105,1]]}";"{""INVALID"":""should be LineString""}";"d1df240e-ab55-4d3b-a59e-2daac18f1ad2"
-"{""type"":""Polygon"",""coordinates"":[[[100,0],[101,0],[101,1],[100,1],[100,0]]]}";"{""valid"":""testdata"",""prop1"":{""this"":""that""}}";"d1df240e-ab55-4d3b-a59e-2daac18f1ad2"
-"{""type"":""MultiPoint"",""coordinates"":[[10,40],[40,30],[20,20],[30,10]]}";"{""valid"":""testdata""}";"d1df240e-ab55-4d3b-a59e-2daac18f1ad2"
-"{""type"":""MultiLineString"",""coordinates"":[[[10,10],[20,20],[10,40]],[[40,40],[30,30],[40,20],[30,10]]]}";"{""valid"":""testdata""}";"d1df240e-ab55-4d3b-a59e-2daac18f1ad2"
-"{""type"":""MultiPolygon"",""coordinates"":[[[[30,20],[45,40],[10,40],[30,20]]],[[[15,5],[40,10],[10,20],[5,10],[15,5]]]]}";"{""valid"":""testdata""}";"d1df240e-ab55-4d3b-a59e-2daac18f1ad2"
-"{""type"":""Point"",""coordinates"":[102,0.5]}";"{""valid"":""testdata""}";"d1df240e-ab55-4d3b-a59e-2daac18f1ad2"

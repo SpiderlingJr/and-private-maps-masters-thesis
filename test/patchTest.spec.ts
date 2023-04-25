@@ -37,7 +37,7 @@ test("patchTest suite", async (t) => {
     console.log("before");
     form.append(
       "valid_data",
-      createReadStream(`test/data/valid_ndjson_1.ndjson`)
+      createReadStream(`test/data/static/valid_ndjson_1.ndjson`)
     );
 
     const uploadResponse = await app.inject({

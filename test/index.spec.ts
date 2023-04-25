@@ -19,7 +19,7 @@ test("general suite", async (t) => {
     try {
       const testData = await generateRandomGeoFeatures(
         2,
-        "test/data",
+        "test/data/dynamic",
         "generalTestSuite"
       );
       randomTestDataPaths = testData;
@@ -35,7 +35,7 @@ test("general suite", async (t) => {
       const form = new FormData();
       form.append(
         "validNdjsonData",
-        createReadStream(`test/data/valid_ndjson_1.ndjson`)
+        createReadStream(`test/data/static/valid_ndjson_1.ndjson`)
       );
 
       const uploadResponse = await app.inject({
@@ -350,7 +350,7 @@ test("general suite", async (t) => {
     const form = new FormData();
     form.append(
       "valid_data",
-      createReadStream(`test/data/germany_outline.ndjson`)
+      createReadStream(`test/data/static/germany_outline.ndjson`)
     );
 
     const uploadResponse = await app.inject({
