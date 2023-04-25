@@ -1,6 +1,6 @@
 /**
- * This plugin is responsible for evicting tiles from cache after they have been updated.
- * It implements logic to find the contents of the cache that are stale due to a change in the database and evicts them.
+ * This plugin implements logic for finding and evicting tiles from cache that
+ * are stale as a result of a change in the database.
  */
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
@@ -22,31 +22,24 @@ interface Evictor {
    * Method to evict tiles from cache that are stale due to a change in the database
    * @param deltaPolys A set of polygons representing the changes in the database
    */
-  evictDiffFromCache(deltaPolys: DeltaPolyPaths[]): Promise<void>;
+  evictDiff(deltaPolys: DeltaPolyPaths[]): Promise<void>;
 }
 
 const cacheEvictionPlugin: FastifyPluginAsync = async (fastify, options) => {
-  async function runEviction(mvts: Set<string>, parents: Set<string>) {
+  async function evict(mvts: Set<string>) {
     try {
       for (const k of mvts) {
         await fastify.cache.del(k);
       }
-      for (const k of parents) {
-        await fastify.cache.del(k);
-      }
     } catch (e) {
-      console.log("error evicting from cache");
-      console.error(e);
+      fastify.log.error("Error during eviction:", e);
+      throw e;
     }
   }
   fastify.decorate("evictor", {
-    async evictDiffFromCache(deltaPolys: DeltaPolyPaths[], maxZoom = 18) {
-      //console.log("evicting from cache");
-      //console.log("deltaPolys", deltaPolys);
-
+    async evictDiff(deltaPolys: DeltaPolyPaths[], maxZoom = 18) {
       const points = parsePolyPoints(deltaPolys);
-      fastify.log.debug("Delta Poly Points");
-      console.log(points);
+      fastify.log.debug("Delta Poly Points:", points);
 
       for (let i = 0; i < points["points"].length; i++) {
         const p = points["points"][i];
@@ -55,41 +48,52 @@ const cacheEvictionPlugin: FastifyPluginAsync = async (fastify, options) => {
           i != points["points"].length - 1 &&
           points["ppath"][i][0] < points["ppath"][i + 1][0]
         ) {
-          fastify.log.debug("NEW POLY");
+          fastify.log.trace("NEW POLY");
         }
       }
       const mvts = rasterize(points, maxZoom);
 
+      // Set of MVTs formatted as string in the form of z/x/y
       const fmtMvts = new Set<string>();
       for (const m of mvts) {
         fmtMvts.add(`${m[0]}/${m[1]}/${m[2]}`);
       }
 
-      const parents = findMvtParents(maxZoom, fmtMvts);
+      const parentMvtStrings = findMvtParents(maxZoom, fmtMvts);
 
-      fastify.log.debug("mvts", mvts);
-      /*mvts.forEach((m) => {
-        fastify.log.debug(`${m[0]}/${m[1]}/${m[2]}`);
-      });
-      */
-      fastify.log.debug("Evicting Tiles", parents);
-      let count = 0;
-      parents.forEach((m) => {
-        const mSplit = m.split("/");
-        count++;
-        fastify.log.debug(`${mSplit[0]}/${mSplit[1]}/${mSplit[2]}`);
-        if (count > 100) {
-          fastify.log.debug(`... ${parents.size - count} more`);
-          return;
-        }
-      });
+      fastify.log.debug("Evicting Tiles", parentMvtStrings);
 
+      if (fastify.log.level === "trace") {
+        const maxTrace = 50;
+        fastify.log.trace("MVTs");
+        let i = 0;
+        mvts.forEach((m) => {
+          i++;
+          fastify.log.trace(`${m[0]}/${m[1]}/${m[2]}`);
+          if (i >= maxTrace) {
+            fastify.log.trace("...");
+            return;
+          }
+        });
+
+        fastify.log.trace("Parents");
+        let j = 0;
+        parentMvtStrings.forEach((m) => {
+          j++;
+          fastify.log.trace(m);
+          if (j >= maxTrace) {
+            fastify.log.trace("...");
+            return;
+          }
+        });
+      }
       const mvtStrings = new Set<string>();
       for (const m of mvts) {
         mvtStrings.add(`${m[0]}/${m[1]}/${m[2]}`);
       }
 
-      await runEviction(mvtStrings, parents);
+      await evict(mvtStrings);
+      await evict(parentMvtStrings);
       return;
     },
   } satisfies Evictor);
