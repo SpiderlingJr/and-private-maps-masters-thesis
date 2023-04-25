@@ -51,6 +51,7 @@
     "@types/form-data": "^2.5.0",
     "@types/geojson": "^7946.0.10",
     "@types/jsonstream": "^0.8.30",
+    "@types/lodash": "^4.14.194",
     "@types/ol": "^6.5.3",
     "@types/pg": "^8.6.5",
     "@types/pg-copy-streams": "^1.2.1",
