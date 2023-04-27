@@ -1,3 +1,8 @@
+/**
+ *  Utility functions for the eviction plugin
+ *  Provides functions for rasterizing polygons and finding the parents of a
+ *  set of MVTs
+ */
 import { DeltaPolyPaths } from "../dbPlugin";
 
 interface PolyDescription {
@@ -5,6 +10,14 @@ interface PolyDescription {
   ppath: number[][];
 }
 
+export class Point {
+  x: number;
+  y: number;
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+}
 /**
  * Converts a point from EPSG:3857 to EPSG:4326
  * @param x  x coordinate in EPSG:3857
@@ -49,57 +62,92 @@ export function parsePolyPoints(poly: DeltaPolyPaths[]): PolyDescription {
   } satisfies PolyDescription;
 }
 
-/** Bresenham implementation based on https://www.cs.helsinki.fi/group/goa/mallinnus/lines/bresenh.html
+/** Bresenham implementation based on
+ * https://www.cs.helsinki.fi/group/goa/mallinnus/lines/bresenh.html
+ * extended using http://eugen.dedu.free.fr/projects/bresenham/
  *
- * @param {*} x0
- * @param {*} y0
- * @param {*} x1
- * @param {*} y1
- * @returns
+ * Algorithm that shoots a ray from p1 to p2 and returns all the points that
+ * the ray intersects. This is used to rasterize a line.
+ * Difference between this and Bresenham's algorithm is that this algorithm
+ * returns all the points that the ray intersects, not just the points that
+ * are closest to the line. This results in a line that is thicker than 1 pixel.
+ *
+ * @param p1 Starting point
+ * @param p2 End point
+ * @returns an array of points that form a line between p1 and p2, including p1
+ *  and p2
  */
-export function bresenham(x0: number, y0: number, x1: number, y1: number) {
-  // Find the height and width of the line
-  const dx = Math.abs(x1 - x0);
-  const dy = Math.abs(y1 - y0);
-  // Find the direction of the line and configure direction of algorithm accordingly
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
+export function supercoverLine(p1: Point, p2: Point): Point[] {
+  const points: Point[] = [];
+  let i: number;
+  let ystep: number;
+  let xstep: number;
+  let error: number;
+  let errorprev: number;
+  let y = p1.y;
+  let x = p1.x;
 
-  let x = x0;
-  let y = y0;
-
-  const points = [];
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    points.push([x, y]);
-    if (x == x1 && y == y1) break;
-
-    const e2 = 2 * err;
-
-    // If the error is greater than the height of the line, move in the x direction
-    if (e2 > -dy) {
-      err -= dy;
-      x += sx;
-
-      if (x % 1 === 0 && y % 1 === 0) {
-        //points.push([x, y - sy]);
-        points.push([x, y + sy]);
+  let dx = p2.x - p1.x;
+  let dy = p2.y - p1.y;
+  points.push({ x: p1.x, y: p1.y });
+  if (dy < 0) {
+    ystep = -1;
+    dy = -dy;
+  } else {
+    ystep = 1;
+  }
+  if (dx < 0) {
+    xstep = -1;
+    dx = -dx;
+  } else {
+    xstep = 1;
+  }
+  const ddy = 2 * dy;
+  const ddx = 2 * dx;
+  if (ddx >= ddy) {
+    errorprev = error = dx;
+    for (i = 0; i < dx; i++) {
+      x += xstep;
+      error += ddy;
+      if (error > ddx) {
+        y += ystep;
+        error -= ddx;
+        if (error + errorprev < ddx) {
+          //points.push({ x: x - xstep, y: y - ystep });
+          points.push({ x, y: y - ystep });
+        } else if (error + errorprev > ddx) {
+          points.push({ x: x - xstep, y });
+        } else {
+          points.push({ x: x - xstep, y });
+          points.push({ x, y: y - ystep });
+        }
       }
+      points.push({ x, y });
+      errorprev = error;
     }
-    // If the error is less than the width of the line, move in the y direction
-    if (e2 < dx) {
-      err += dx;
-      y += sy;
-
-      if (x % 1 === 0 && y % 1 === 0) {
-        points.push([x, y - sy]);
-        //points.push([x, y + sy]);
+  } else {
+    errorprev = error = dy;
+    for (i = 0; i < dy; i++) {
+      y += ystep;
+      error += ddx;
+      if (error > ddy) {
+        x += xstep;
+        error -= ddy;
+        if (error + errorprev < ddy) {
+          //points.push({ x: x - xstep, y });
+          points.push({ x: x - xstep, y });
+        } else if (error + errorprev > ddy) {
+          points.push({ x, y: y - ystep });
+        } else {
+          points.push({ x: x - xstep, y });
+          points.push({ x, y: y - ystep });
+        }
       }
-      // Also push a point moving in the x direction
-      //points.push([x0 - sx, y0]);
+      points.push({ x, y });
+      errorprev = error;
     }
   }
+  // assert ((y == y2) && (x == x2));
   return points;
 }
 
@@ -112,6 +160,7 @@ export function bresenham(x0: number, y0: number, x1: number, y1: number) {
  * @returns [x,y] vector tile coordinate
  *
  */
+
 export function findWrappingMVT(
   x: number,
   y: number,
@@ -182,14 +231,17 @@ export function rasterize(
     console.log(`P1 ${p1} -> MVT "${zoom}/${mvt_p1[0]}/${mvt_p1[1]}"`);
     console.log(`P2 ${p2} -> MVT "${zoom}/${mvt_p2[0]}/${mvt_p2[1]}"`);
 
-    const line = bresenham(mvt_p1[0], mvt_p1[1], mvt_p2[0], mvt_p2[1]);
+    const line = supercoverLine(
+      { x: mvt_p1[0], y: mvt_p1[1] },
+      { x: mvt_p2[0], y: mvt_p2[1] }
+    );
 
     console.log("Line: ", line);
     //console.log("Point1 : ", p1, "MVT: ", mvt_p1);
     //console.log("Point2 : ", p2, "MVT: ", mvt_p2);
     // Add the line to the set of MVTs
     for (const p of line) {
-      mvt.add([zoom, p[0], p[1]]);
+      mvt.add([zoom, p.x, p.y]);
     }
   }
   return mvt;
