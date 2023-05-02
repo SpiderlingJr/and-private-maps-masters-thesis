@@ -69,6 +69,25 @@ interface PostgresDB {
     buffer?: number,
     name?: string
   ): Promise<MVTResponse[]>;
+  /** Patches features of a collection in db. Passed features and collection must already exist.
+     * Calculates the difference between existing and patched features and returns the difference.
+     *
+     * First copies all features to a temporary table (patch_features) and calculates the Difference
+     * between the Union and Intersection of both existing and patched features, using the postgis
+     * ST_Difference, ST_Union and ST_Intersection functions. Then, the resulting multipolygon is
+     * returned as a point cloud (ST_DumpPoints). Finally, the new features are updated in the db
+     * and the temporary table entries are deleted.
+     *
+     * Passed features are assumed to be valid and must be formatted as csv with the following columns:
+     * - feature_id: uuid (must already exist in db)
+     * - geom:  Geometry in WKT format
+     * - properties: properties as json, can be {}
+     * - ft_collection, uuid of collection to which feature belongs
+     *
+
+     * @param patchPath path to csv file containing features to be patched
+     * @returns diff between existing and patched features
+     */
   patchAndGetDiff(patchPath: string): Promise<DeltaPolyPaths[]>;
 }
 
@@ -79,14 +98,6 @@ interface PostgresDB {
  * @param options The options passed to fastify.register( ... , { **here** }). I.e. {strategy: 'redis'}
  */
 const dbPlugin: FastifyPluginAsync = async (fastify) => {
-  /*fastify.register(fastifyPostgres, {
-    host: process.env.POSTGRES_HOST,
-    port: Number(process.env.POSTGRES_EXPOSE),
-    database: process.env.POSTGRES_DB,
-    user: process.env.POSTGRES_USER,
-    password: process.env.POSTGRES_PASSWORD,
-  });
-  */
   let conn: DataSource;
   async function connectDB(): Promise<DataSource> {
     try {
@@ -285,32 +296,31 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       return mvtResponse;
     },
     async patchAndGetDiff(patchPath: string) {
-      // start transaction
-      // stream validated data to db in tmp table
-
+      // Query to copy features from csv to db
       const query =
         "COPY patch_features(feature_id, geom, properties, ft_collection) \
         FROM STDIN (FORMAT CSV, DELIMITER ';')";
-
       const copyQuery = pgcopy.from(query);
       const queryRunner = conn.createQueryRunner();
-      queryRunner.startTransaction();
 
+      queryRunner.startTransaction();
       const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
 
       const copyTimer = fastify.performanceMeter.startTimer("copyStreamPatch");
       try {
+        // Copies csv file to db
         await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
         copyTimer.stop(true);
-      } catch (e: any) {
+      } catch (e) {
         copyTimer.stop(false);
-        console.error(e);
+        fastify.log.error(e);
         throw e;
       }
 
       // TODO assert that all features in patch data are contained in existing features
-      //  else abort transaction
-      // calculate diff between existing and patch data
+      // ? else abort transaction
+
+      // Query to get difference between existing and patched features
       const deltaPolyQuery = `
         SELECT tmp2.featid as featId, 
         (ST_DumpPoints(diffpoly)).path as path, 
@@ -353,16 +363,18 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           FROM patch_features
           WHERE features.feature_id = patch_features.feature_id`
         );
-
         if (!updateResult) {
-          throw new Error("Error while updating features");
+          // TODO construct a scenario where this happens
+          throw new Error(
+            "Error while updating features: could not receive update result"
+          );
         }
         await queryRunner.commitTransaction();
         return deltaPolys;
       } catch (err) {
         await queryRunner.rollbackTransaction();
         fastify.log.error(
-          "Error while trying to receive delta poly, rolling back transaction",
+          "Error while trying to receive delta poly, rolling back transaction\n",
           err
         );
         deltaPolyTimer.stop(false);

@@ -24,7 +24,7 @@ export class Point {
  * @param y  y coordinate in EPSG:3857
  * @returns  [lon, lat] in EPSG:4326
  */
-function convert3857To4326(x: number, y: number): number[] {
+function convert3857To4326(x: number, y: number): [number, number] {
   const lon = (x / 20037508.34) * 180;
   const lat = (y / 20037508.34) * 180;
 
@@ -154,9 +154,10 @@ export function supercoverLine(p1: Point, p2: Point): Point[] {
 /**
  * Find the MVT that a point intersects given a zoom level
  * given a zoom level
- * @param x x coordinate in epsg 3857
- * @param y y coordinate in epsg 3857
+ * @param x x coordinate
+ * @param y y coordinate
  * @param zoom zoom level
+ * @param mapping EPSG:3857 or EPSG:4326, default EPSG:3857
  * @returns [x,y] vector tile coordinate
  *
  */
@@ -164,9 +165,13 @@ export function supercoverLine(p1: Point, p2: Point): Point[] {
 export function findWrappingMVT(
   x: number,
   y: number,
-  zoom: number
+  zoom: number,
+  mapping: "EPSG:3857" | "EPSG:4326" = "EPSG:3857"
 ): [number, number] {
-  const lonlat = convert3857To4326(x, y);
+  let lonlat: [number, number] = [x, y];
+  if (mapping === "EPSG:3857") {
+    lonlat = convert3857To4326(x, y);
+  }
   const lon = lonlat[0];
   const lat = lonlat[1];
 
