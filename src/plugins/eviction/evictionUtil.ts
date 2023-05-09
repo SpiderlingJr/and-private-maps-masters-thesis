@@ -3,7 +3,7 @@
  *  Provides functions for rasterizing polygons and finding the parents of a
  *  set of MVTs
  */
-import { DeltaPolyPaths } from "../dbPlugin";
+import { GeometryDump } from "../dbPlugin";
 
 interface PolyDescription {
   points: number[][];
@@ -41,7 +41,7 @@ function convert3857To4326(x: number, y: number): [number, number] {
  * @param poly  Array of points in EPSG:3857
  *
  */
-export function parsePolyPoints(poly: DeltaPolyPaths[]): PolyDescription {
+export function parsePolyPoints(poly: GeometryDump[]): PolyDescription {
   const points = poly.map((p) => p.geom);
   const ppath = poly.map((p) => p.path); // Path that connects the points to polygons
 
