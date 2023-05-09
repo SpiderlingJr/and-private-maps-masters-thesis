@@ -11,9 +11,50 @@ import { Jobs, JobState } from "src/entities/jobs.js";
 import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner";
 import { styleSchema } from "../schema/httpRequestSchemas.js";
 
-export interface DeltaPolyPaths {
+/** Result of a ST_DumpPoints query, also including feature id
+ * References:
+ * - https://postgis.net/docs/ST_DumpPoints.html
+ * - https://postgis.net/docs/geometry_dump.html
+ *
+ * @example
+ * {
+ *  featid: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+ *  path: [0, 0],
+ *  geom: "POINT(1 2)"
+ * }
+ *
+ * {
+ *  featid: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+ *  path: [0, 1],
+ *  geom: "POINT(3 4)"
+ * }
+ *
+ */
+export interface GeometryDump {
+  /** the uuid of the dumped feature
+   *
+   * @example
+   * "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+   */
   featid: string;
-  path: Array<number>;
+  /** description of the geometry position in the dump
+   * first position: index of the geometry (can be more than one)
+   * second position: index of the point in the geometry
+   *
+   * @example
+   * [0, 0] -> first geometry, first point
+   * [0, 1] -> first geometry, second point
+   * [1, 0] -> second geometry, first point
+   */
+  path: number[];
+  /** the geometry as WKT string
+   *
+   * @example
+   * "POINT(1 2)"
+   * "LINESTRING(1 2, 3 4)"
+   * "POLYGON((1 2, 3 4, 5 6, 1 2))"
+   *
+   */
   geom: string;
 }
 interface MVTResponse {
@@ -59,7 +100,6 @@ interface PostgresDB {
     collId: string,
     featId: string
   ): Promise<Features | null>;
-
   getMVT(
     collId: string,
     z: number,
@@ -88,7 +128,7 @@ interface PostgresDB {
      * @param patchPath path to csv file containing features to be patched
      * @returns diff between existing and patched features
      */
-  patchAndGetDiff(patchPath: string): Promise<DeltaPolyPaths[]>;
+  patchAndGetDiff(patchPath: string): Promise<GeometryDump[]>;
 }
 
 /**
@@ -291,7 +331,9 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         AND ft_collection = '${collId}') \
       SELECT ST_AsMVT(mvtgeom.*, '${name}') FROM mvtgeom;`;
 
+      fastify.log.debug(`Queriying mvt: ${z}/${x}/${y}`);
       const mvtResponse = await Features.query(mvt_tmpl);
+      fastify.log.debug(`Received: ${z}/${x}/${y}`);
 
       return mvtResponse;
     },
@@ -316,7 +358,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         fastify.log.error(e);
         throw e;
       }
-
       // TODO assert that all features in patch data are contained in existing features
       // ? else abort transaction
 
@@ -338,13 +379,15 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
               ON og.feature_id = pg.feature_id
             ) as tmp
           ) as tmp2
-            `;
+        `;
 
       const deltaPolyTimer =
         fastify.performanceMeter.startTimer("deltaPolyQuery");
       let featIds;
+      /* Let db calculate difference between existing and patched features
+      and return as geometry dump */
       try {
-        const deltaPolys: DeltaPolyPaths[] = await queryRunner.query(
+        const deltaPolys: GeometryDump[] = await queryRunner.query(
           deltaPolyQuery
         );
         deltaPolyTimer.stop(true);
@@ -352,6 +395,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         featIds = deltaPolys.map((d) => d.featid);
 
         if (!deltaPolys) {
+          // TODO how does this handle if patch set is identical
           throw new Error("Error while calculating delta polygons");
         }
 
