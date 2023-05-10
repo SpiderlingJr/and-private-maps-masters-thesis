@@ -17,15 +17,51 @@
   <body>
     <div id="map" class="map"></div>
     <br />
-    <form>
-      <label for="type">Geometry type &nbsp;</label>
-      <select id="type">
-        <option value="Point">Point</option>
-        <option value="LineString">LineString</option>
-        <option value="Polygon">Polygon</option>
-        <option value="Circle">Circle</option>
-      </select>
-    </form>
+    <span>
+      <form>
+        <label for="type">Geometry type &nbsp;</label>
+        <select id="type">
+          <option value="Point">Point</option>
+          <option value="LineString">LineString</option>
+          <option value="Polygon">Polygon</option>
+          <option value="Circle">Circle</option>
+        </select>
+        <form>
+          <label for="fill">Fill &nbsp;</label>
+          <input id="fillColor" type="color" value="#0000ff" />
+        </form>
+        <select id="prefabProvider">
+          <option value="philippines">Philippines</option>
+          <option value="titanic">Titanic</option>
+          <option value="midway">Midway Battlegrounds</option>
+        </select>
+        <button id="prefabSelectButton">Show</button>
+        <button id="prefabClearButton">Clear</button>
+      </form>
+    </span>
+    <div cass="collectionJump">
+      <b>Displayed Collections</b>
+      <br />
+      <span
+        >Collection1
+        <input
+          id="collection1Input"
+          value="eb8ace56-83a5-44e7-80d1-5ec9fefc8013"
+        />
+        <button id="collection1Button">Show</button>
+      </span>
+      <br />
+      <span
+        >Collection2
+        <input
+          id="collection2Input"
+          value="6b62af50-aa44-48b8-9ca8-b0c3fb095ce9"
+        />
+        <button id="collection1Button">Show</button>
+      </span>
+      <br />
+      <button id="deltaButton">Show Delta</button>
+    </div>
     <br />
     <div class="tileCoord">
       <a id="tileJump" tileJump></a>
@@ -47,7 +83,6 @@
       <button id="lonlatJumpButton">Jump to lon/lat</button>
     </div>
     <br />
-    <button id="deltaButton">Delta</button>
     <script src="https://cdn.jsdelivr.net/npm/elm-pep@1.0.6/dist/elm-pep.js"></script>
     <script type="module" src="main.ts"></script>
   </body>
