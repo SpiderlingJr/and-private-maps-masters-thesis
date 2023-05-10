@@ -367,22 +367,29 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
 
       // Query to get difference between existing and patched features
       const deltaPolyQuery = `
-        SELECT tmp2.featid as featId, 
-        (ST_DumpPoints(diffpoly)).path as path, 
-        ST_AsText(ST_Transform(ST_SetSRID((ST_DumpPoints(diffpoly)).geom, 4326),3857))
-            as geom FROM (
+        SELECT 
+          tmp2.featid AS featId, 
+          (ST_DumpPoints(diffpoly)).path AS path, 
+          ST_AsText(
+            ST_Transform(
+              ST_SetSRID(
+                (ST_DumpPoints(diffpoly)).geom,
+              4326),
+            3857)
+          ) AS geom 
+          FROM (
             SELECT 
               featId,
-              St_AsText(ST_Difference(g_union, g_inter)) as diffpoly         
+              St_AsText(ST_Difference(g_union, g_inter)) AS diffpoly         
             FROM ( 
               SELECT 
-                og.feature_id as featId,
-                ST_Union(og.geom, pg.geom) as g_union, 
-                ST_Intersection(og.geom, pg.geom) as g_inter
-              FROM features as og JOIN patch_features as pg
+                og.feature_id AS featId,
+                ST_Union(og.geom, pg.geom) AS g_union, 
+                ST_Intersection(og.geom, pg.geom) AS g_inter
+              FROM features AS og JOIN patch_features AS pg
               ON og.feature_id = pg.feature_id
-            ) as tmp
-          ) as tmp2
+            ) AS tmp
+          ) AS tmp2
         `;
 
       const deltaPolyTimer =
