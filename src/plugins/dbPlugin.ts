@@ -11,6 +11,10 @@ import { Jobs, JobState } from "src/entities/jobs.js";
 import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner";
 import { styleSchema } from "../schema/httpRequestSchemas.js";
 
+/* TODO Consider path length behavior in DumpPoints when querying more than 1 
+polygon
+https://postgis.net/docs/ST_DumpPoints.html
+*/
 /** Result of a ST_DumpPoints query, also including feature id
  * References:
  * - https://postgis.net/docs/ST_DumpPoints.html
@@ -339,10 +343,10 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
     },
     async patchAndGetDiff(patchPath: string) {
       // Query to copy features from csv to db
-      const query =
+      const copyQuery = pgcopy.from(
         "COPY patch_features(feature_id, geom, properties, ft_collection) \
-        FROM STDIN (FORMAT CSV, DELIMITER ';')";
-      const copyQuery = pgcopy.from(query);
+      FROM STDIN (FORMAT CSV, DELIMITER ';')"
+      );
       const queryRunner = conn.createQueryRunner();
 
       queryRunner.startTransaction();
