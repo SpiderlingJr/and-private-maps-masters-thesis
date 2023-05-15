@@ -495,7 +495,6 @@ test("general suite", async (t) => {
        TODO patch collection with patchable original properties
        TODO todo assert collection is patched correctly
       */
-
       const collectionId = randomTestDataPaths.collectionId;
 
       const mutatedDataNdjson = readFileSync(
@@ -510,7 +509,7 @@ test("general suite", async (t) => {
 
       const mutatedPatchRes = await app.inject({
         method: "PATCH",
-        url: `/data`,
+        url: `/collections/${collectionId}`,
         payload: mutatedForm,
         headers: mutatedForm.getHeaders(),
       });

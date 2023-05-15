@@ -13,7 +13,9 @@ import styleRoutes from "./routes/style";
 import mvtRoutes from "./routes/mvt";
 import validatorPlugin from "./plugins/validatorPlugin";
 import filesPlugin from "./plugins/filesPlugin";
-import cacheEvictionPlugin from "./plugins/cacheEvictionPlugin";
+import cacheEvictionPlugin, {
+  EvictionStrategy,
+} from "./plugins/cacheEvictionPlugin";
 import performanceMeterPlugin from "./plugins/performanceMeterPlugin";
 import { TransportMultiOptions } from "pino";
 
@@ -82,7 +84,7 @@ app.register(filesPlugin);
 app.register(validatorPlugin);
 // TODO make cache eviction strategy configurable
 app.register(cacheEvictionPlugin, {
-  strategy: "bresenhamBO",
+  strategy: EvictionStrategy.BRESENHAM_BOTTOM_UP,
 });
 app.register(performanceMeterPlugin);
 

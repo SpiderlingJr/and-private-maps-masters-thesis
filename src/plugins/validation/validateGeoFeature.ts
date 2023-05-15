@@ -67,7 +67,6 @@ export function validatePostData(
   const geoValidationTransform = new GeoValidationTransform();
   const jsonToCsvTransform = new GeoJsonToCsvTransform(colId, {}, "POST");
   const writeStream = createWriteStream(outpath);
-  console.log("WRITING TO", outpath);
   const validationPipeline = pipeline(
     data.file,
     readLineTransform,
@@ -78,6 +77,7 @@ export function validatePostData(
     (err) => {
       if (err) {
         console.error("Error in validation Pipeline:\n", err);
+        throw err;
       }
     }
   );

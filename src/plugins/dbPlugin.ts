@@ -70,32 +70,98 @@ declare module "fastify" {
   }
 }
 interface PostgresDB {
-  getJobById(jobId: string): Promise<Jobs | null>;
+  /*
+   * Collection operations *
+   */
+  createCollection(): Promise<string>;
+  updateCollection(collectionId: string): Promise<string>;
+  deleteCollection(collectionId: string): Promise<DeleteResult>;
+  /** Deletes entries from patch_features table by collection id. Does not
+   *  affect features table.
+   *
+   * @param collectionId uuid of collection to be deleted
+   */
+  deletePatchCollection(collectionId: string): Promise<DeleteResult>;
+  getCollectionById(collId: string): Promise<Collections | null>;
+  listCollections(): Promise<Collections[]>;
   setStyle(
     collId: string,
     Style: { minZoom: number; maxZoom: number }
   ): Promise<UpdateResult>;
-  createJob(): Promise<string>;
-  updateJob(
-    jobId: string,
-    state: JobState,
-    colId?: string,
-    note?: string
-  ): Promise<UpdateResult | undefined>;
-  createCollection(): Promise<string>;
-  listCollections(): Promise<Collections[]>;
-  getCollectionById(collId: string): Promise<Collections | null>;
   getCollectionZoomLevel(
     collId: string
   ): Promise<{ minZoom: number; maxZoom: number }>;
-
-  updateCollection(collectionId: string): Promise<string>;
-  deleteCollection(collectionId: string): Promise<DeleteResult>;
-  /**
-   * Streams contents of validated csv file to db
-   * @param fpath
+  /** Applies patch by updating contents from patch_features to features table
+   *
+   * @param collectionId uuid of collection to be patched
    */
-  copyStreamCollection(collectionPath: string): Promise<unknown>;
+  patchCollection(collectionId: string): Promise<unknown>;
+  /** Patches features of a collection in db. Passed features and collection must already exist.
+   * Calculates the difference between existing and patched features and returns the difference.
+   *
+   * First copies all features to a temporary table (patch_features) and calculates the Difference
+   * between the Union and Intersection of both existing and patched features, using the postgis
+   * ST_Difference, ST_Union and ST_Intersection functions. Then, the resulting multipolygon is
+   * returned as a point cloud (ST_DumpPoints). Finally, the new features are updated in the db
+   * and the temporary table entries are deleted.
+   *
+   * Passed features are assumed to be valid and must be formatted as csv with the following columns:
+   * - feature_id: uuid (must already exist in db)
+   * - geom:  Geometry in WKT format
+   * - properties: properties as json, can be {}
+   * - ft_collection, uuid of collection to which feature belongs
+   *
+   * @deprecated
+   * @param patchPath path to csv file containing features to be patched
+   * @returns diff between existing and patched features
+   */
+  patchAndGetDiff(patchPath: string): Promise<GeometryDump[]>;
+  /** Compares features in the tables features and patch_features and returns
+   * their difference, as a point cloud (ST_DumpPoints).
+   *
+   * Calculates the Difference between the Union and Intersection of both
+   * existing and patched features, using the postgis ST_Difference, ST_Union
+   * and ST_Intersection functions. Then, the resulting multipolygon is
+   * returned as a point cloud (ST_DumpPoints).
+   *
+   * Assumes that all entries in table 'patch_features' are valid and exist in
+   * table 'features', analogous with the collection id, which must exist in
+   * both tables.
+   *
+   * @param collectionId uuid of collection to be patched
+   * @returns diff between existing and patched features as GeometryDump[]
+   */
+  getPatchDelta(collectionId: string): Promise<GeometryDump[]>;
+  /*
+   * Feature operations *
+   */
+  /** Streams contents of csv file to features table.
+   *
+   * Contents are assumed to be valid and must be formatted as colon-seperated
+   * csv containing only following columns:
+   * - geom: Geometry in WKT format (POINT, LINESTRING, POLYGON)
+   * - properties: properties as json, can be {}
+   * - ft_collection, uuid of collection to which feature belongs
+   *
+   * @example
+   * "POINT(1 2)";{"name": "foo"};"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+   * "LINESTRING(1 2, 3 4)";{};"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+   *
+   * @param file path to csv file
+   */
+  copyToFeatures(collectionPath: string): Promise<unknown>;
+  /** Streams contents of csv file to patch_features table
+   *
+   * Contents are assumed to be valid and must be formatted as colon-seperated
+   * csv containing only following columns:
+   * - feature_id: uuid (must already exist in db)
+   * - geom: Geometry in WKT format (POINT, LINESTRING, POLYGON)
+   * - properties: properties as json, can be {}
+   * - ft_collection, uuid of collection to which feature belongs
+   *
+   * @param file path to csv file
+   */
+  copyToPatchFeatures(patchPath: string): Promise<unknown>;
   getFeaturesByCollectionId(
     collId: string,
     limit?: number
@@ -113,28 +179,18 @@ interface PostgresDB {
     buffer?: number,
     name?: string
   ): Promise<MVTResponse[]>;
-  /** Patches features of a collection in db. Passed features and collection must already exist.
-     * Calculates the difference between existing and patched features and returns the difference.
-     *
-     * First copies all features to a temporary table (patch_features) and calculates the Difference
-     * between the Union and Intersection of both existing and patched features, using the postgis
-     * ST_Difference, ST_Union and ST_Intersection functions. Then, the resulting multipolygon is
-     * returned as a point cloud (ST_DumpPoints). Finally, the new features are updated in the db
-     * and the temporary table entries are deleted.
-     *
-     * Passed features are assumed to be valid and must be formatted as csv with the following columns:
-     * - feature_id: uuid (must already exist in db)
-     * - geom:  Geometry in WKT format
-     * - properties: properties as json, can be {}
-     * - ft_collection, uuid of collection to which feature belongs
-     *
-
-     * @param patchPath path to csv file containing features to be patched
-     * @returns diff between existing and patched features
-     */
-  patchAndGetDiff(patchPath: string): Promise<GeometryDump[]>;
+  /*
+   * Job operations *
+   */
+  createJob(): Promise<string>;
+  updateJob(
+    jobId: string,
+    state: JobState,
+    colId?: string,
+    note?: string
+  ): Promise<UpdateResult | undefined>;
+  getJobById(jobId: string): Promise<Jobs | null>;
 }
-
 /**
  *  Plugin handling database communication
 
@@ -164,7 +220,17 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
   function isJobState(value: string): value is JobState {
     return ["pending", "finished", "error"].includes(value);
   }
-
+  async function copy(file: string, copyQuery: string) {
+    try {
+      const query = pgcopy.from(copyQuery);
+      const queryRunner = conn.createQueryRunner();
+      const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
+      await pipeline(createReadStream(file), pgConn.query(query));
+    } catch (e) {
+      throw new Error("Error while copying to db:\n" + e);
+    }
+    //
+  }
   conn = await connectDB();
 
   fastify.decorate("db", {
@@ -199,7 +265,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       const job = await Jobs.findOne({ where: { job_id: jobId } });
       return job;
     },
-
     async setStyle(collId: string, style: object) {
       const { minZoom, maxZoom } = style as typeof styleSchema;
 
@@ -225,21 +290,34 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       const colls = await Collections.find();
       return colls;
     },
-    /**
-     * Streams contents of validated csv file to db
-     * @param fpath
-     */
-    async copyStreamCollection(collectionPath: string) {
-      const query =
-        "COPY features(geom, properties, ft_collection) FROM STDIN (FORMAT CSV, DELIMITER ';')";
-      const copyQuery = pgcopy.from(query);
-      const queryRunner = conn.createQueryRunner();
-      const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
+    async copyToFeatures(file: string) {
+      const copyQuery = `COPY features(geom, properties, ft_collection) 
+          FROM STDIN (FORMAT CSV, DELIMITER ';')`;
+      const copyTimer = fastify.performanceMeter.startTimer("copyToFeatures");
 
-      return await pipeline(
-        createReadStream(collectionPath),
-        pgConn.query(copyQuery)
+      try {
+        await copy(file, copyQuery);
+        copyTimer.stop(true);
+      } catch (e) {
+        copyTimer.stop(false);
+        fastify.log.error(e);
+        throw e;
+      }
+    },
+    async copyToPatchFeatures(file: string) {
+      const copyQuery = `COPY patch_features(feature_id, geom, properties, ft_collection) 
+          FROM STDIN (FORMAT CSV, DELIMITER ';')`;
+      const copyTimer = fastify.performanceMeter.startTimer(
+        "copyToPatchFeatures"
       );
+      try {
+        await copy(file, copyQuery);
+        copyTimer.stop(true);
+      } catch (e) {
+        copyTimer.stop(false);
+        fastify.log.error(e);
+        throw e;
+      }
     },
     async getFeaturesByCollectionId(colId: string, limit?: number) {
       const feats = await Features.createQueryBuilder()
@@ -307,6 +385,15 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       const deleteResponse = await Collections.delete({ coll_id: colId });
       return deleteResponse;
     },
+    async deletePatchCollection(colId: string) {
+      const deleteResponse = await conn
+        .createQueryBuilder()
+        .delete()
+        .from(PatchFeatures)
+        .where("ft_collection = :id", { id: colId })
+        .execute();
+      return deleteResponse;
+    },
     async getMVT(
       collId: string,
       z: number,
@@ -341,33 +428,34 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
 
       return mvtResponse;
     },
-    async patchAndGetDiff(patchPath: string) {
-      // Query to copy features from csv to db
-      const copyQuery = pgcopy.from(
-        "COPY patch_features(feature_id, geom, properties, ft_collection) \
-      FROM STDIN (FORMAT CSV, DELIMITER ';')"
+    async patchCollection(collectionId: string) {
+      const queryRunner = conn.createQueryRunner();
+      const updateResult = await queryRunner.query(
+        `UPDATE features 
+            SET geom = patch_features.geom, 
+                properties = patch_features.properties
+          FROM patch_features
+          WHERE 
+            patch_features.ft_collection = '${collectionId}' 
+          AND  
+            features.feature_id = patch_features.feature_id`
       );
+      if (!updateResult) {
+        // TODO construct a scenario where this happens
+        throw new Error(
+          "Error while updating features: could not receive update result"
+        );
+      }
+      return updateResult;
+    },
+    async getPatchDelta(collectionId: string) {
       const queryRunner = conn.createQueryRunner();
 
-      queryRunner.startTransaction();
-      const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
-
-      const copyTimer = fastify.performanceMeter.startTimer("copyStreamPatch");
-      try {
-        // Copies csv file to db
-        await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
-        copyTimer.stop(true);
-      } catch (e) {
-        copyTimer.stop(false);
-        fastify.log.error(e);
-        throw e;
-      }
-      // TODO assert that all features in patch data are contained in existing features
-      // ? else abort transaction
-
-      // Query to get difference between existing and patched features
-      const deltaPolyQuery = `
-        SELECT 
+      const deltaPolyTimer =
+        fastify.performanceMeter.startTimer("getPatchDelta");
+      // TODO reduce select to  collectionId in patch_features
+      const deltaPolys: GeometryDump[] = await queryRunner.query(
+        `SELECT 
           tmp2.featid AS featId, 
           (ST_DumpPoints(diffpoly)).path AS path, 
           ST_AsText(
@@ -386,23 +474,84 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
                 og.feature_id AS featId,
                 ST_Union(og.geom, pg.geom) AS g_union, 
                 ST_Intersection(og.geom, pg.geom) AS g_inter
-              FROM features AS og JOIN patch_features AS pg
-              ON og.feature_id = pg.feature_id
+              FROM 
+                features AS og 
+              JOIN 
+                patch_features AS pg
+              ON 
+                og.feature_id = pg.feature_id
+              WHERE 
+                og.ft_collection = '${collectionId}'
             ) AS tmp
           ) AS tmp2
-        `;
-
+        `
+      );
+      deltaPolyTimer.stop(true);
+      if (!deltaPolys) {
+        // TODO how does this handle if patch set is identical
+        throw new Error("Error while calculating delta polygons");
+      }
+      return deltaPolys;
+    },
+    /**
+     * @deprecated
+     * @param patchPath
+     * @returns
+     */
+    async patchAndGetDiff(patchPath: string) {
+      // Query to copy features from csv to db
+      const copyQuery = pgcopy.from(
+        "COPY patch_features(feature_id, geom, properties, ft_collection) \
+      FROM STDIN (FORMAT CSV, DELIMITER ';')"
+      );
+      const queryRunner = conn.createQueryRunner();
+      queryRunner.startTransaction();
+      const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
+      const copyTimer = fastify.performanceMeter.startTimer("copyStreamPatch");
+      try {
+        // Copies csv file to db
+        await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
+        copyTimer.stop(true);
+      } catch (e) {
+        copyTimer.stop(false);
+        fastify.log.error(e);
+        throw e;
+      }
       const deltaPolyTimer =
         fastify.performanceMeter.startTimer("deltaPolyQuery");
       let featIds;
       /* Let db calculate difference between existing and patched features
       and return as geometry dump */
       try {
+        // TODO assert that all features in patch data are contained in existing features
+        // Query to get difference between existing and patched features `
         const deltaPolys: GeometryDump[] = await queryRunner.query(
-          deltaPolyQuery
+          `SELECT 
+            tmp2.featid AS featId, 
+            (ST_DumpPoints(diffpoly)).path AS path, 
+            ST_AsText(
+              ST_Transform(
+                ST_SetSRID(
+                  (ST_DumpPoints(diffpoly)).geom,
+                4326),
+              3857)
+            ) AS geom 
+            FROM (
+              SELECT 
+                featId,
+                St_AsText(ST_Difference(g_union, g_inter)) AS diffpoly         
+              FROM ( 
+                SELECT 
+                  og.feature_id AS featId,
+                  ST_Union(og.geom, pg.geom) AS g_union, 
+                  ST_Intersection(og.geom, pg.geom) AS g_inter
+                FROM features AS og JOIN patch_features AS pg
+                ON og.feature_id = pg.feature_id
+              ) AS tmp
+            ) AS tmp2
+          `
         );
         deltaPolyTimer.stop(true);
-
         featIds = deltaPolys.map((d) => d.featid);
 
         if (!deltaPolys) {

@@ -30,7 +30,6 @@ export default async function (
       });
       return;
     }
-
     const ftype: string = data.filename.split(".").slice(-1)[0];
 
     // Assure file is ndjson/ndgeojson
@@ -55,6 +54,7 @@ export default async function (
           error: "Bad Request",
           message: "Invalid GeoJSON.",
         });
+        timer.stop(false);
         return;
       }
 
@@ -66,7 +66,7 @@ export default async function (
       );
 
       await app.db
-        .copyStreamCollection(`./storage/validated/${jobId}.csv`)
+        .copyToFeatures(`./storage/validated/${jobId}.csv`)
         .then(async () => {
           await app.db.updateJob(
             jobId,
@@ -94,17 +94,95 @@ export default async function (
     });
   });
 
-  // Insert data into db if already exists
-  // TODO check if application type is ndjson
-  app.patch("/data", async function patchData(req, reply) {
+  /**
+   * Patches a single collection
+   */
+  app.patch(
+    "/collections/:collId",
+    {
+      schema: {
+        params: collIdSchema,
+      },
+    },
+    async function (req, reply) {
+      const data = await req.file();
+      if (!data) {
+        reply.code(400).send({
+          error: "No file received.",
+        });
+        return;
+      }
+      const ftype: string = data.filename.split(".").slice(-1)[0];
+
+      // Assure file is ndjson/ndgeojson
+      if (!["ndjson", "ndgeojson"].includes(ftype)) {
+        reply
+          .status(400)
+          .send(
+            new Error(
+              `Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`
+            )
+          );
+      }
+      const jobId = await app.db.createJob();
+      const collId = req.params.collId;
+
+      reply.send(jobId);
+
+      try {
+        const isValid = await app.validate.validateData(
+          data,
+          collId,
+          jobId,
+          "UPDATE"
+        );
+        if (!isValid) {
+          app.db.updateJob(jobId, JobState.ERROR, collId, "Invalid GeoJSON.");
+          reply.code(400).send({
+            error: "Bad Request",
+            message: "Invalid GeoJSON.",
+          });
+          return;
+        }
+        await app.db.updateJob(
+          jobId,
+          JobState.PENDING,
+          collId,
+          "File validated, patching..."
+        );
+        // Stream patch data to temporary table
+        // TODO on error -> rollback
+        await app.db
+          .copyToPatchFeatures(`./storage/validated/${jobId}.csv`)
+          .then(async () => {
+            app.files.deleteFile(`./storage/validated/${jobId}.csv`);
+          });
+        // Find all mvts that are affected by the patch
+        await app.evictor.evict(collId).then(async () => {
+          console.log("evicted");
+          // Apply patch to database
+          await app.db.patchCollection(collId);
+          await app.db.updateJob(
+            jobId,
+            JobState.FINISHED,
+            collId,
+            "Patch finished."
+          );
+        });
+      } catch (e: any) {
+        fastify.log.error("Error during patching:", e);
+        await app.db.updateJob(jobId, JobState.ERROR, collId, e.message);
+      } finally {
+        app.db.deletePatchCollection(collId);
+      }
+    }
+  );
+  /*
+  // Insert data into db if not already exists
+  // Todo implement put
+  app.put("/data", async function name(req, reply) {
     const data = await req.file();
 
-    if (!data) {
-      reply.code(400).send({
-        error: "No file received.",
-      });
-      return;
-    }
     const ftype: string = data.filename.split(".").slice(-1)[0];
 
     // Assure file is ndjson/ndgeojson
@@ -112,111 +190,29 @@ export default async function (
       reply
         .status(400)
         .send(
-          new Error(
-            `Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`
-          )
+          new Error(`Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`)
         );
     }
-    const jobId = await app.db.createJob();
-    const collId = await app.db.createCollection();
+
+    const jobId = await pgConn.createNewJob();
+
+    // temporarily store received data, for later validation of geojson content
+    const tmpStorage = path.join(
+      process.cwd(),
+      "storage",
+      "received",
+      jobId + ".ndjson"
+    );
+
+    await pump(data.file, createWriteStream(tmpStorage));
+
+    setImmediate(() => {
+      featureValidator.validateAndPutGeoFeature(tmpStorage, jobId);
+    });
 
     reply.send(jobId);
-    /*
-    await app.jobManager.run(
-      app.validate.validateData(data, collId, jobId, "UPDATE"),
-    )*/
-
-    try {
-      const isValid = await app.validate.validateData(
-        data,
-        collId,
-        jobId,
-        "UPDATE"
-      );
-      if (!isValid) {
-        app.db.updateJob(jobId, JobState.ERROR, collId, "Invalid GeoJSON.");
-        reply.code(400).send({
-          error: "Bad Request",
-          message: "Invalid GeoJSON.",
-        });
-        return;
-      }
-      await app.db.updateJob(
-        jobId,
-        JobState.PENDING,
-        collId,
-        "File validated, patching..."
-      );
-      // Patch logic here
-
-      const diffPolyTimer = app.performanceMeter.startTimer(
-        `diffPoly-cid-${collId}`
-      );
-      const diffPolys = await app.db
-        .patchAndGetDiff(`./storage/validated/${jobId}.csv`)
-        .then((res) => {
-          diffPolyTimer.stop(true);
-          return res;
-        })
-        .catch((e) => {
-          console.log("Error during patching: ", e);
-        })
-        .finally(async () => {
-          await app.files.deleteFile(`./storage/validated/${jobId}.csv`);
-        });
-
-      await app.db.updateJob(
-        jobId,
-        JobState.FINISHED,
-        collId,
-        "Patch finished."
-      );
-
-      if (diffPolys) {
-        await app.evictor.evictDiffFromCache(diffPolys);
-      }
-    } catch (e: any) {
-      console.log("error", e);
-      await app.db.updateJob(jobId, JobState.ERROR, collId, e.message);
-    }
   });
-
-  /*
-// Insert data into db if not already exists
-// Todo implement put
-app.put("/data", async function name(req, reply) {
-  const data = await req.file();
-
-  const ftype: string = data.filename.split(".").slice(-1)[0];
-
-  // Assure file is ndjson/ndgeojson
-  if (!["ndjson", "ndgeojson"].includes(ftype)) {
-    reply
-      .status(400)
-      .send(
-        new Error(`Invalid File Type: ${ftype}. Expected ndjson | ndgeojson .`)
-      );
-  }
-
-  const jobId = await pgConn.createNewJob();
-
-  // temporarily store received data, for later validation of geojson content
-  const tmpStorage = path.join(
-    process.cwd(),
-    "storage",
-    "received",
-    jobId + ".ndjson"
-  );
-
-  await pump(data.file, createWriteStream(tmpStorage));
-
-  setImmediate(() => {
-    featureValidator.validateAndPutGeoFeature(tmpStorage, jobId);
-  });
-
-  reply.send(jobId);
-});
-*/
+  */
   // Delete existing data
   app.delete(
     "/collections/:collId",

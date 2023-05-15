@@ -4,36 +4,45 @@
  */
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-import { GeometryDump } from "./dbPlugin";
 import {
   findMvtParents,
   parsePolyPoints,
   rasterize,
 } from "./eviction/evictionUtil";
 
+// TODO make max zoom env config
+const MAX_ZOOM = 18;
 declare module "fastify" {
   interface FastifyInstance {
     evictor: Evictor;
   }
 }
-
+export enum EvictionStrategy {
+  BOXCUT_BOTTOM_UP,
+  BOXCUT_TOP_DOWN,
+  BRESENHAM_BOTTOM_UP,
+}
 interface Evictor {
   /**
    * Method to evict tiles from cache that are stale due to a change in the database
    * @param deltaPolys A set of polygons representing the changes in the database
    */
-  evictDiff(deltaPolys: GeometryDump[]): Promise<void>;
+  evict(collectionId: string): Promise<void>;
 }
-
 /**
  *
  * @param fastify
- * @param options
+ * @param options strategy: The eviction strategy to use
+ *  - boxcutBO: Naive approach using bounding boxes with a bottom up approach
+ *  - boxcutTD: Naive approach using bounding boxes with a top down approach
+ *  - bresenhamBO: Bresenham's line algorithm with a bottom up approach
+ *
  */
 const cacheEvictionPlugin: FastifyPluginAsync<{
-  strategy?: "naiveBO" | "naiveTD" | "bresenhamBO";
+  strategy?: EvictionStrategy;
 }> = async (fastify, options) => {
-  async function evict(mvts: Set<string>) {
+  fastify.log.info("Using cache eviction strategy:", options.strategy);
+  async function evictEntries(mvts: Set<string>) {
     try {
       for (const k of mvts) {
         await fastify.cache.del(k);
@@ -43,73 +52,105 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
       throw e;
     }
   }
-  if (options.strategy === "naiveBO") {
-    throw new Error("Not implemented");
-  } else if (options.strategy === "naiveTD") {
-    throw new Error("Not implemented");
-  } else if (options.strategy === "bresenhamBO") {
-    fastify.decorate("evictor", {
-      async evictDiff(deltaPolys: GeometryDump[], maxZoom = 18) {
-        fastify.log.debug("Delta Polys:", deltaPolys);
-        const points = parsePolyPoints(deltaPolys);
-        fastify.log.debug("Delta Poly Points:", points);
-        /*
-        for (let i = 0; i < points["points"].length; i++) {
-          const p = points["points"][i];
-          fastify.log.debug(`[${p[0]}, ${p[1]}]`);
-          if (
-            i != points["points"].length - 1 &&
-            points["ppath"][i][0] < points["ppath"][i + 1][0]
-          ) {
-            fastify.log.trace("NEW POLY");
+  /* Pseudo 
+      N = tables.patch_features(collection_id)
+      E = tables.features(collection_id)
+      evict(N, E)
+        -> evictStrat1 =: boxcut
+        -> evictStrat2 =: raster
+        -> evictStrat3 =: cluster search
+      */
+  switch (options.strategy) {
+    case EvictionStrategy.BOXCUT_BOTTOM_UP:
+      fastify.decorate("evictor", {
+        async evict(collectionId: string) {
+          throw new Error("Not implemented");
+        },
+      } satisfies Evictor);
+      break;
+    case EvictionStrategy.BOXCUT_TOP_DOWN:
+      throw new Error("Not implemented");
+      break;
+    case EvictionStrategy.BRESENHAM_BOTTOM_UP:
+      fastify.log.info("Using Bresenham Bottom Up");
+      fastify.decorate("evictor", {
+        /** Bresenham bottom up eviction strategy
+         *
+         * @param collectionId
+         * @param maxZoom
+         * @returns
+         */
+        async evict(collectionId: string, maxZoom: number = MAX_ZOOM) {
+          /* Get difference between patch and existing data
+          - existing data resides in table 'features'
+          - patch data resides in table 'patch_features'
+          */
+          const deltaPolys = await fastify.db.getPatchDelta(collectionId);
+          fastify.log.debug("Delta Polys:", deltaPolys);
+          const points = parsePolyPoints(deltaPolys);
+          fastify.log.debug("Delta Poly Points:", points);
+
+          const mvts = rasterize(points, maxZoom);
+
+          // TODO fill holes in mvt raster
+
+          // Set of MVTs formatted as string in the form of z/x/y
+          // TODO remove fmtMvts, use mvtStrings instead
+          const fmtMvts = new Set<string>();
+          const mvtStrings = new Set<string>();
+          for (const m of mvts) {
+            fmtMvts.add(`${m[0]}/${m[1]}/${m[2]}`);
           }
-        }*/
-        const mvts = rasterize(points, maxZoom);
+          for (const m of mvts) {
+            mvtStrings.add(`${m[0]}/${m[1]}/${m[2]}`);
+          }
+          const parentMvtStrings = findMvtParents(maxZoom, fmtMvts);
+          if (fastify.log.level === "trace") {
+            const maxTrace = 50;
+            fastify.log.trace("MVTs");
+            let i = 0;
+            mvts.forEach((m) => {
+              i++;
+              fastify.log.trace(`${m[0]}/${m[1]}/${m[2]}`);
+              if (i >= maxTrace) {
+                fastify.log.trace("...");
+                return;
+              }
+            });
+            let j = 0;
+            fastify.log.debug(
+              "Evicting",
+              parentMvtStrings.size,
+              "parent tiles"
+            );
+            parentMvtStrings.forEach((m) => {
+              j++;
+              fastify.log.debug(m);
+              if (j >= maxTrace) {
+                fastify.log.debug("...");
+                return;
+              }
+            });
+          }
 
-        // Set of MVTs formatted as string in the form of z/x/y
-        const fmtMvts = new Set<string>();
-        for (const m of mvts) {
-          fmtMvts.add(`${m[0]}/${m[1]}/${m[2]}`);
-        }
-
-        const parentMvtStrings = findMvtParents(maxZoom, fmtMvts);
-
-        fastify.log.debug("Evicting Tiles", parentMvtStrings);
-
-        if (fastify.log.level === "trace") {
-          const maxTrace = 50;
-          fastify.log.trace("MVTs");
-          let i = 0;
-          mvts.forEach((m) => {
-            i++;
-            fastify.log.trace(`${m[0]}/${m[1]}/${m[2]}`);
-            if (i >= maxTrace) {
-              fastify.log.trace("...");
-              return;
-            }
+          fastify.log.debug("Evicting", mvtStrings.size, "tiles");
+          mvtStrings.forEach((m) => {
+            fastify.log.debug(m);
           });
-
-          fastify.log.trace("Parents");
-          let j = 0;
+          fastify.log.debug("Evicting", parentMvtStrings.size, "parent tiles");
           parentMvtStrings.forEach((m) => {
-            j++;
-            fastify.log.trace(m);
-            if (j >= maxTrace) {
-              fastify.log.trace("...");
-              return;
-            }
+            fastify.log.debug(m);
           });
-        }
-        const mvtStrings = new Set<string>();
-        for (const m of mvts) {
-          mvtStrings.add(`${m[0]}/${m[1]}/${m[2]}`);
-        }
 
-        await evict(mvtStrings);
-        await evict(parentMvtStrings);
-        return;
-      },
-    } satisfies Evictor);
+          await evictEntries(parentMvtStrings);
+          await evictEntries(mvtStrings);
+          return;
+        },
+      } satisfies Evictor);
+      break;
+    default:
+      throw new Error("Invalid eviction strategy");
   }
 };
+
 export default fp(cacheEvictionPlugin);
