@@ -17,6 +17,9 @@ interface Cache<T = Map<string, string> | FastifyRedis> {
   del(key: string): Promise<void>;
   clear(): Promise<void>;
   [storeSymbol]: T;
+  stats(): {
+    length: number;
+  };
 }
 
 /**
@@ -49,6 +52,11 @@ const cachePlugin: FastifyPluginAsync<{
       async clear() {
         fastify.redis.flushdb();
       },
+      stats() {
+        return {
+          length: -99,
+        };
+      },
     } satisfies Cache<FastifyRedis>); // makes sure that the interface is implemented
   } else if (options.strategy === "memory") {
     fastify.decorate("cache", {
@@ -64,6 +72,12 @@ const cachePlugin: FastifyPluginAsync<{
       },
       async clear() {
         this[storeSymbol].clear();
+      },
+      stats() {
+        return {
+          length: this[storeSymbol].size,
+          entries: Array.from(this[storeSymbol].keys()),
+        };
       },
     } satisfies Cache<Map<string, string>>);
   }

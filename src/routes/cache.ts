@@ -22,7 +22,6 @@ export default async function (
     },
     async function (request, reply) {
       const { z, x, y } = request.params;
-
       //const mvt = await mvtCache.getTile(`${z}/${x}/${y}`);
       const mvt = await app.cache.get(`${z}/${x}/${y}`);
       if (mvt) {
@@ -33,4 +32,9 @@ export default async function (
       }
     }
   );
+
+  app.get("/cacheInfo", async function (request, reply) {
+    //const mvt = await mvtCache.getTile(`${z}/${x}/${y}`);
+    reply.send(app.cache.stats());
+  });
 }
