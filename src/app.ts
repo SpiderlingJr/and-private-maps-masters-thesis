@@ -80,7 +80,10 @@ app.register(cachePlugin, {
 app.register(dbPlugin);
 app.register(filesPlugin);
 app.register(validatorPlugin);
-app.register(cacheEvictionPlugin);
+// TODO make cache eviction strategy configurable
+app.register(cacheEvictionPlugin, {
+  strategy: "bresenhamBO",
+});
 app.register(performanceMeterPlugin);
 
 // Register routes
