@@ -8,7 +8,7 @@ test("random generator", async (t) => {
   t.teardown(process.exit);
 
   let colId: string | undefined;
-  await generateRandomGeoFeatures(100, "test/data", "notRandom")
+  await generateRandomGeoFeatures(100, "test/data/dynamic", "notRandom")
     .then((res) => {
       console.log("Generated collection: ", res.collectionId);
       t.pass("random generator works");
@@ -17,6 +17,8 @@ test("random generator", async (t) => {
     .catch((err) => {
       console.log("Error in random generator test");
       t.fail(err);
+    })
+    .finally(() => {
       t.end();
     });
 
