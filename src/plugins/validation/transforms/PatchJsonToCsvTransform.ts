@@ -49,8 +49,6 @@ export class PatchJsonToCsvTransform extends Transform {
       csv_properties +
       '";"{""type"":""Point"",""coordinates"":[0,0]}"\n';
 
-    console.log(csv_line);
-
     return csv_line;
   }
 }

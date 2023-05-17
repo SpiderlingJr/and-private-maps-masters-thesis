@@ -75,7 +75,6 @@ export class GeoJsonToCsvTransform extends Transform {
     } else if (strategy === "UPDATE") {
       if (!ndj.featId) throw new Error("field featId is required for update");
 
-      console.log(ndj);
       const csv_featId = JSON.stringify(ndj.featId);
 
       const csv_line =

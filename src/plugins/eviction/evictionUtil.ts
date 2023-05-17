@@ -232,16 +232,10 @@ export function rasterize(
     // convert to MVT coordinates
     const mvt_p1 = findWrappingMVT(p1[0], p1[1], zoom);
     const mvt_p2 = findWrappingMVT(p2[0], p2[1], zoom);
-
-    console.log(`P1 ${p1} -> MVT "${zoom}/${mvt_p1[0]}/${mvt_p1[1]}"`);
-    console.log(`P2 ${p2} -> MVT "${zoom}/${mvt_p2[0]}/${mvt_p2[1]}"`);
-
     const line = supercoverLine(
       { x: mvt_p1[0], y: mvt_p1[1] },
       { x: mvt_p2[0], y: mvt_p2[1] }
     );
-
-    console.log("Line: ", line);
     //console.log("Point1 : ", p1, "MVT: ", mvt_p1);
     //console.log("Point2 : ", p2, "MVT: ", mvt_p2);
     // Add the line to the set of MVTs
