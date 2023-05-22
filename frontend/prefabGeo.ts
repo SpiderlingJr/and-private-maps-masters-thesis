@@ -226,3 +226,29 @@ export const setzensack2 = turf.polygon([
     [1366399.0665829133, 6197575.164119005],
   ],
 ]);
+
+/** Big quadrangle for tests on low zoom levels
+ *
+ * Corner points reside in the following tiles:
+ * 4x4 on zoom level 3
+ * Upper Left: 3/3/1
+ * Lower Left: 3/3/4
+ * Lower Right: 3/6/4
+ * Upper Right: 3/6/1
+ *
+ * Ref: imgs/bigQuadrangle.png
+ */
+export const bigQuadrangle = turf.polygon([
+  [
+    [-2450478.684056025, 12441269.68254023],
+    [-2410826.808284878, -2654260.1151822116],
+    [13024171.59935586, -2662959.251193231],
+    [12932021.44928567, 12601293.324045219],
+    [-2450478.684056025, 12441269.68254023],
+  ],
+]);
+
+console.log(
+  "bigQuadrangleJSON",
+  JSON.stringify(turf.toWgs84(bigQuadrangle.geometry))
+);
