@@ -24,8 +24,13 @@ export default async function (
     async function (request, reply) {
       const { collId, z, x, y } = request.params;
 
-      const mvt = await app.db.getMVT(collId, z, x, y);
-      reply.code(200).send(mvt);
+      try {
+        const mvt = await app.db.getMVT(collId, z, x, y);
+        reply.send(mvt);
+      } catch (e) {
+        fastify.log.error(e);
+        reply.code(500).send();
+      }
     }
   );
 
@@ -56,25 +61,30 @@ export default async function (
       // Try fetching requested tile from cache
       const cachedMvt = await app.cache.get(zxy_key);
       if (cachedMvt === "") {
+        fastify.log.debug(`Tile ${zxy_key} is empty.`);
         reply.code(204).send();
       }
 
       if (cachedMvt) {
-        app.log.trace(`Tile ${zxy_key} already cached.`);
+        app.log.debug(`Tile ${zxy_key} already cached.`);
         //const mvt = Buffer.from(cachedMvt, "base64");
         //reply.send(mvt);
-        console.log(`Cache hit for ${z}/${x}/${y}`);
-        console.log(cachedMvt);
+        console.debug(`Cache hit for ${zxy_key}`);
+        console.debug(cachedMvt);
         reply.send(cachedMvt);
       } else {
         // tile not in cache, request from db and cache.
-        app.log.trace(`Requesting Tile ${zxy_key} from db`);
-        const res = await app.db.getMVT(collId, z, x, y);
-        const mvt = res[0].st_asmvt;
-        // Store new tile in cache
-        await app.cache.set(zxy_key, mvt);
-
-        reply.send(mvt);
+        app.log.debug(`Requesting Tile ${zxy_key} from db`);
+        try {
+          const res = await app.db.getMVT(collId, z, x, y);
+          const mvt = res[0].st_asmvt;
+          // Store new tile in cache
+          await app.cache.set(zxy_key, mvt);
+          reply.send(mvt);
+        } catch (e) {
+          console.error(e);
+          reply.code(500).send();
+        }
       }
     }
   );
