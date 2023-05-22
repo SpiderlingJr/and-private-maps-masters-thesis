@@ -10,6 +10,21 @@ import { Collections } from "src/entities/collections.js";
 import { Jobs, JobState } from "src/entities/jobs.js";
 import { PostgresQueryRunner } from "typeorm/driver/postgres/PostgresQueryRunner";
 import { styleSchema } from "../schema/httpRequestSchemas.js";
+import {
+  MVT1,
+  MVT2,
+  MVT3,
+  MVT4,
+  MVT5,
+  MVT6,
+  MVT7,
+  MVT8,
+  MVT9,
+  MVT10,
+  MVT11,
+  MVT12,
+  MVT13,
+} from "src/entities/mvts.js";
 
 /* TODO Consider path length behavior in DumpPoints when querying more than 1 
 polygon
