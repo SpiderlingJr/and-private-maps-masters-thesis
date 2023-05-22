@@ -10,8 +10,6 @@ import {
   rasterize,
 } from "./eviction/evictionUtil";
 
-// TODO make max zoom env config
-const MAX_ZOOM = 18;
 declare module "fastify" {
   interface FastifyInstance {
     evictor: Evictor;
@@ -89,8 +87,6 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           fastify.log.debug("Delta Poly Points:", points);
 
           const mvts = rasterize(points, maxZoom);
-
-          // TODO fill holes in mvt raster
 
           // Set of MVTs formatted as string in the form of z/x/y
           // TODO remove fmtMvts, use mvtStrings instead
