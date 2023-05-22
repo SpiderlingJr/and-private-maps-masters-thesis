@@ -18,9 +18,12 @@ declare module "fastify" {
   }
 }
 export enum EvictionStrategy {
+  BOXCUT_BO,
   BOXCUT_BOTTOM_UP,
+  BOXCUT_TD,
   BOXCUT_TOP_DOWN,
-  BRESENHAM_BOTTOM_UP,
+  RASTER_BO,
+  RASTER_BOTTOM_UP,
 }
 interface Evictor {
   /**
@@ -41,7 +44,12 @@ interface Evictor {
 const cacheEvictionPlugin: FastifyPluginAsync<{
   strategy?: EvictionStrategy;
 }> = async (fastify, options) => {
-  fastify.log.info("Using cache eviction strategy:", options.strategy);
+  // Deepest considered zoom level
+  const maxZoom = process.env.MAX_ZOOM ? parseInt(process.env.MAX_ZOOM) : 9;
+
+  fastify.log.info(
+    `Using cache eviction strategy: ${options.strategy} with max zoom ${maxZoom}`
+  );
   async function evictEntries(mvts: Set<string>) {
     try {
       for (const k of mvts) {
@@ -61,18 +69,8 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
         -> evictStrat3 =: cluster search
       */
   switch (options.strategy) {
-    case EvictionStrategy.BOXCUT_BOTTOM_UP:
-      fastify.decorate("evictor", {
-        async evict(collectionId: string) {
-          throw new Error("Not implemented");
-        },
-      } satisfies Evictor);
-      break;
-    case EvictionStrategy.BOXCUT_TOP_DOWN:
-      throw new Error("Not implemented");
-      break;
-    case EvictionStrategy.BRESENHAM_BOTTOM_UP:
-      fastify.log.info("Using Bresenham Bottom Up");
+    case EvictionStrategy.RASTER_BOTTOM_UP | EvictionStrategy.RASTER_BO:
+      fastify.log.info("Using Eviciton Strategy: Bresenham Bottom Up");
       fastify.decorate("evictor", {
         /** Bresenham bottom up eviction strategy
          *
@@ -80,7 +78,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
          * @param maxZoom
          * @returns
          */
-        async evict(collectionId: string, maxZoom: number = MAX_ZOOM) {
+        async evict(collectionId: string) {
           /* Get difference between patch and existing data
           - existing data resides in table 'features'
           - patch data resides in table 'patch_features'

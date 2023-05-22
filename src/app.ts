@@ -84,7 +84,7 @@ app.register(filesPlugin);
 app.register(validatorPlugin);
 // TODO make cache eviction strategy configurable
 app.register(cacheEvictionPlugin, {
-  strategy: EvictionStrategy.BRESENHAM_BOTTOM_UP,
+  strategy: process.env.EVICTION_STRATEGY as EvictionStrategy | undefined,
 });
 app.register(performanceMeterPlugin);
 
