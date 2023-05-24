@@ -185,13 +185,27 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           );
           const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
 
-          fastify.log.metric("Evicting", mvtStrings.size, "tiles");
+          fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
+          let i = 0;
           mvtStrings.forEach((m) => {
-            fastify.log.debug(m);
+            i++;
+            if (i < 50) {
+              fastify.log.trace(m);
+            } else {
+              fastify.log.trace("...");
+              return;
+            }
           });
-          fastify.log.metric("Evicting", parentMvtStrings.size, "parent tiles");
+          fastify.log.metric(`Evicting ${parentMvtStrings.size} parent tiles`);
+          i = 0;
           parentMvtStrings.forEach((m) => {
-            fastify.log.debug(m);
+            i++;
+            if (i < 50) {
+              fastify.log.trace(m);
+            } else {
+              fastify.log.trace("...");
+              return;
+            }
           });
 
           await evictEntries(parentMvtStrings);

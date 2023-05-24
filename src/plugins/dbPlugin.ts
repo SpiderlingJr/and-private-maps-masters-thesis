@@ -683,7 +683,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           ORDER BY x asc, y asc
       `
       );
-      console.log(mvtResult);
       // Build MVTStrings from query Result
       for (const row of mvtResult) {
         const { x, y } = row;

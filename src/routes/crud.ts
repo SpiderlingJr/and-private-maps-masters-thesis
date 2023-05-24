@@ -159,7 +159,7 @@ export default async function (
           });
         // Find all mvts that are affected by the patch
         await app.evictor.evict(collId).then(async () => {
-          console.log("evicted");
+          fastify.log.debug("eviction done");
           // Apply patch to database
           await app.db.patchCollection(collId);
           await app.db.updateJob(

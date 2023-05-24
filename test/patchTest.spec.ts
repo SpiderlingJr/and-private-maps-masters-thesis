@@ -34,7 +34,7 @@ test("patchTest suite", async (t) => {
     // bonus: assert feature have been CORRECTLY updated
 
     const form = new FormData();
-    console.log("before");
+    //console.log("before");
     form.append(
       "valid_data",
       createReadStream(`test/data/static/valid_ndjson_1.ndjson`)
@@ -46,13 +46,13 @@ test("patchTest suite", async (t) => {
       payload: form,
       headers: form.getHeaders(),
     });
-    console.log("uploadResponse", uploadResponse.statusCode);
+    //console.log("uploadResponse", uploadResponse.statusCode);
 
     const jobId = uploadResponse.body;
     const jobResponse = await awaitJobCompletion(jobId);
     const cid = JSON.parse(jobResponse.body).job_collection;
 
-    console.log("cid", cid);
+    //console.log("cid", cid);
     // get feature id
     const features = await app.inject({
       method: "GET",
@@ -61,6 +61,7 @@ test("patchTest suite", async (t) => {
 
     featureId = JSON.parse(features.body)[0].Features_feature_id;
   });
+  /*
   t.test("patch a feature", async (sub1) => {
     const patchData = {
       featId: featureId,
@@ -70,11 +71,11 @@ test("patchTest suite", async (t) => {
     };
 
     const oneLiner = JSON.stringify(patchData).replace(/\s+/g, "");
-    //console.log("oneLiner", oneLiner);
+    ////console.log("oneLiner", oneLiner);
 
     //t.todo("not implemented yet");
     sub1.equal(1, 1);
-  });
+  });*/
 
   todo("patch a non existent feature", async (sub1) => {
     //

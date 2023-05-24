@@ -7,7 +7,7 @@ import path from "path";
 const { postFeaturesToService, getFeatureIdsFromService } = prepUpdate;
 
 const NUM_FEATURES = 3;
-const STORE_PATH = "outgeos";
+const STORE_PATH = "randomData";
 
 // write file as ndjson
 function writeAsNdjson(features: FeatureCollection, path) {

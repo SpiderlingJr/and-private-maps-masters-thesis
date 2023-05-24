@@ -47,7 +47,7 @@ const loggerTransports = {
         translateTime: "HH:MM:ss Z",
         ignore: "pid,hostname",
       },
-      level: "debug",
+      level: "info",
     },
     {
       target: "pino-pretty",

@@ -55,9 +55,7 @@ export const randomGeometries: RandomGeometries = {
     feature: T,
     options = MutationOptions
   ): T {
-    console.log("in Alter");
     let mutatedFeature = feature;
-    console.log("mutatedFeatureOptions", options);
 
     /*if (Math.random() < options.pRotate) {
       mutatedFeature = turf.transformRotate(

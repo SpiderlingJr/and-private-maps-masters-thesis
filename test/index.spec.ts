@@ -24,7 +24,7 @@ test("general suite", async (t) => {
       );
       randomTestDataPaths = testData;
     } catch (e) {
-      console.log(e);
+      console.log("error in generating random geo featues", e);
     }
   });
 

@@ -54,7 +54,7 @@ export default async function (
 
       // return nothing if z is out of bounds for zoom levels of requested collection
       if (!(minZoom <= z && z <= maxZoom)) {
-        console.log("Out of bounds", minZoom, maxZoom);
+        fastify.log.debug("Out of bounds", minZoom, maxZoom);
         reply.code(200).send();
         return;
       }
@@ -70,7 +70,7 @@ export default async function (
         //const mvt = Buffer.from(cachedMvt, "base64");
         //reply.send(mvt);
         console.debug(`Cache hit for ${zxy_key}`);
-        console.debug(cachedMvt);
+        //console.debug(cachedMvt);
         reply.send(cachedMvt);
       } else {
         // tile not in cache, request from db and cache.

@@ -216,7 +216,7 @@ export function rasterize(
   const points = polyDescription.points;
   const ppath = polyDescription.ppath;
 
-  console.log("Points: ", points);
+  //console.log("Points: ", points);
   const mvt = new Set<number[]>();
   for (let i = 0; i < points.length - 1; i++) {
     // In case of multiple polygons, only connect points that belong to the same polygon
