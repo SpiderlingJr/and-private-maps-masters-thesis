@@ -44,10 +44,26 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
 }> = async (fastify, options) => {
   // Deepest considered zoom level
   const maxZoom = process.env.MAX_ZOOM ? parseInt(process.env.MAX_ZOOM) : 9;
+  let strategy: EvictionStrategy;
 
-  fastify.log.info(
-    `Using cache eviction strategy: ${options.strategy} with max zoom ${maxZoom}`
-  );
+  if (options.strategy === undefined) {
+    throw new Error("No eviction strategy provided.");
+  }
+  try {
+    strategy =
+      EvictionStrategy[
+        options.strategy as unknown as keyof typeof EvictionStrategy
+      ];
+  } catch (e) {
+    fastify.log.error(
+      "Invalid eviction strategy:",
+      options.strategy,
+      "Valid strategies are:",
+      Object.keys(EvictionStrategy)
+    );
+    throw e;
+  }
+
   async function evictEntries(mvts: Set<string>) {
     try {
       for (const k of mvts) {
@@ -62,13 +78,17 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
       N = tables.patch_features(collection_id)
       E = tables.features(collection_id)
       evict(N, E)
-        -> evictStrat1 =: boxcut
-        -> evictStrat2 =: raster
+        -> evictStrat1 =: raster
+        -> evictStrat2 =: boxcut
         -> evictStrat3 =: cluster search
       */
-  switch (options.strategy) {
-    case EvictionStrategy.RASTER_BOTTOM_UP | EvictionStrategy.RASTER_BO:
-      fastify.log.info("Using Eviciton Strategy: Bresenham Bottom Up");
+  switch (strategy) {
+    // Fallthrough to be more user-friendly when typing the strategy name
+    case EvictionStrategy.RASTER_BO:
+    case EvictionStrategy.RASTER_BOTTOM_UP:
+      fastify.log.info(
+        `Using Eviciton Strategy: Bresenham Bottom Up with Max Zoom ${maxZoom}`
+      );
       fastify.decorate("evictor", {
         /** Bresenham bottom up eviction strategy
          *
@@ -142,6 +162,47 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
         },
       } satisfies Evictor);
       break;
+    case EvictionStrategy.BOXCUT_BO:
+    case EvictionStrategy.BOXCUT_BOTTOM_UP:
+      fastify.log.info(
+        `Using Eviciton Strategy: Boxcut Bottom Up with Max Zoom ${maxZoom}`
+      );
+      fastify.decorate("evictor", {
+        /** Compares the entries in the tables features and patch_features of a given
+         * collection and finds corresponding MVTs that need to be invalidated, using
+         * the following strategy:
+         * 1. Get features from patch_features table (N)
+         * 2. Get features from features table (E)
+         * 3. Build the bounding box of N and E
+         * 4. Build the union of N and E =: U
+         * 5. Run over all MVTs in passed mvtTable and check if they intersect with U
+         * 6. Return all intersecting MVTs in form of z/x/y
+         */
+        async evict(collectionId: string) {
+          const mvtStrings = await fastify.db.getPatchedMVTStrings(
+            collectionId,
+            maxZoom
+          );
+          const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
+
+          fastify.log.metric("Evicting", mvtStrings.size, "tiles");
+          mvtStrings.forEach((m) => {
+            fastify.log.debug(m);
+          });
+          fastify.log.metric("Evicting", parentMvtStrings.size, "parent tiles");
+          parentMvtStrings.forEach((m) => {
+            fastify.log.debug(m);
+          });
+
+          await evictEntries(parentMvtStrings);
+          await evictEntries(mvtStrings);
+          return;
+        },
+      } satisfies Evictor);
+      break;
+    case EvictionStrategy.BOXCUT_TD:
+    case EvictionStrategy.BOXCUT_TOP_DOWN:
+      throw new Error("Not implemented");
     default:
       throw new Error("Invalid eviction strategy");
   }

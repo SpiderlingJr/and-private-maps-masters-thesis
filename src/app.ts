@@ -2,7 +2,7 @@ import { fastify } from "fastify";
 import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import closeWithGrace from "close-with-grace";
 
-import cachePlugin from "./plugins/cachePlugin";
+import cachePlugin, { CacheStrategy } from "./plugins/cachePlugin";
 import dbPlugin from "./plugins/dbPlugin";
 
 import helperRoutes from "./routes/helpers";
@@ -77,14 +77,18 @@ const app = fastify({
 
 // Register plugins
 app.register(cachePlugin, {
-  strategy: process.env.STRATEGY as "memory" | "redis" | undefined,
+  strategy: process.env.CACHE_STRATEGY?.toUpperCase() as
+    | CacheStrategy
+    | undefined,
 });
 app.register(dbPlugin);
 app.register(filesPlugin);
 app.register(validatorPlugin);
 // TODO make cache eviction strategy configurable
 app.register(cacheEvictionPlugin, {
-  strategy: process.env.EVICTION_STRATEGY as EvictionStrategy | undefined,
+  strategy: process.env.EVICTION_STRATEGY?.toUpperCase() as
+    | EvictionStrategy
+    | undefined,
 });
 app.register(performanceMeterPlugin);
 
