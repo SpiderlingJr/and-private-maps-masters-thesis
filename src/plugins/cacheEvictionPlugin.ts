@@ -179,7 +179,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
          * 6. Return all intersecting MVTs in form of z/x/y
          */
         async evict(collectionId: string) {
-          const mvtStrings = await fastify.db.getPatchedMVTStrings(
+          const mvtStrings = await fastify.db.getPatchedMVTStringsBoxcut(
             collectionId,
             maxZoom
           );

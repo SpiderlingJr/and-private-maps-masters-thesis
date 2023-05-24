@@ -205,6 +205,26 @@ interface PostgresDB {
     note?: string
   ): Promise<UpdateResult | undefined>;
   getJobById(jobId: string): Promise<Jobs | null>;
+  /** Compares the entries in the tables features and patch_features of a given
+   * collection and finds corresponding MVTs that need to be invalidated, using
+   * the following strategy:
+   * 1. Get features from patch_features table (N)
+   * 2. Get features from features table (E)
+   * 3. Build the bounding box of N and E
+   * 4. Build the union of N and E =: U
+   * 5. Run over all MVTs in passed mvtTable and check if they intersect with U
+   * 6. Return all intersecting MVTs in form of z/x/y
+   *
+   * @param collId: uuid of updated collection, must exist in features and
+   *  patch_features table
+   * @param mvtTable name of table contaning mvt geometries witht their z/x/y
+   *  positions, usually named 'mvt<zoomlevel>'
+   */
+
+  getPatchedMVTStringsBoxcut(
+    collId: string,
+    zoomLevel: number
+  ): Promise<Set<string>>;
 }
 /**
  *  Plugin handling database communication
@@ -223,7 +243,26 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         username: process.env.POSTGRES_USER,
         password: process.env.POSTGRES_PASSWORD,
         database: process.env.POSTGRES_DB,
-        entities: [Features, Collections, Jobs, TmpFeatures, PatchFeatures],
+        entities: [
+          Features,
+          Collections,
+          Jobs,
+          TmpFeatures,
+          PatchFeatures,
+          MVT1,
+          MVT2,
+          MVT3,
+          MVT4,
+          MVT5,
+          MVT6,
+          MVT7,
+          MVT8,
+          MVT9,
+          MVT10,
+          MVT11,
+          MVT12,
+          MVT13,
+        ],
         synchronize: true,
       });
 
@@ -423,6 +462,12 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       const bufferFloat = buffer * 1.0;
       const featureTable = "features";
 
+      /* 
+      TODO Alternative: content-type json ermöglichen
+      rückgabe nicht als mvtgeom sondern feature-collection (=: content in dieser mvt)
+      
+      TODO fastify content-type helper anschauen
+      */
       const mvt_tmpl = `WITH mvtgeom AS (\
       SELECT ST_AsMVTGeom(
        ST_Transform(ST_SetSRID(geom,4326), 3857), 
@@ -437,13 +482,13 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         AND ft_collection = '${collId}') \
       SELECT ST_AsMVT(mvtgeom.*, '${name}') FROM mvtgeom;`;
 
-      fastify.log.debug(`Queriying mvt: ${z}/${x}/${y}`);
       const mvtResponse = await Features.query(mvt_tmpl);
       fastify.log.debug(`Received: ${z}/${x}/${y}`);
 
       return mvtResponse;
     },
     async patchCollection(collectionId: string) {
+      console.debug("Patching collection", collectionId);
       const queryRunner = conn.createQueryRunner();
       const updateResult = await queryRunner.query(
         `UPDATE features 
@@ -611,6 +656,41 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           );
         }
       }
+    },
+    async getPatchedMVTStringsBoxcut(collId: string, zoomLevel: number) {
+      const mvtStrings = new Set<string>();
+      const queryRunner = conn.createQueryRunner();
+      const mvtResult = await queryRunner.query(
+        `
+          WITH
+          E AS (
+            SELECT ST_Envelope(ST_Union(geom)) as geom
+            FROM features
+            WHERE ft_collection = '${collId}'
+          ),
+          N AS (
+            SELECT ST_Envelope(ST_Union(geom)) as geom
+            FROM patch_features
+            WHERE ft_collection = '${collId}'
+          )
+          SELECT x, y --, union_geom
+          FROM (
+            -- Union Box
+            SELECT ST_Union(E.geom, N.geom) as union_geom
+            FROM E, N
+          ) as uni JOIN mvt${zoomLevel}
+          ON ST_Intersects(union_geom, mvt${zoomLevel}.geom)
+          ORDER BY x asc, y asc
+      `
+      );
+      console.log(mvtResult);
+      // Build MVTStrings from query Result
+      for (const row of mvtResult) {
+        const { x, y } = row;
+        mvtStrings.add(`${zoomLevel}/${x}/${y}`);
+      }
+      return mvtStrings;
+      //
     },
   } satisfies PostgresDB);
 
