@@ -3,11 +3,15 @@ import { writeFileSync } from "fs";
 import { FeatureCollection, featureCollection as fc } from "@turf/turf";
 import { prepUpdate } from "./PrepUpdateSet";
 import path from "path";
+import { awaitJobCompletion } from "../injects";
 
-const { postFeaturesToService, getFeatureIdsFromService } = prepUpdate;
+const {
+  postFeaturesToService: postFeaturesToService,
+  getFeatureIdsFromService,
+} = prepUpdate;
 
 const NUM_FEATURES = 3;
-const STORE_PATH = "randomData";
+const STORE_PATH = "outgeos";
 
 // write file as ndjson
 function writeAsNdjson(features: FeatureCollection, path) {
@@ -86,16 +90,13 @@ export default async function generateRandomGeoFeatures(
   writeAsNdjson(randomFeatures, originalFeaturesPath);
 
   // post features to database
-  const jobId = await postFeaturesToService(originalFeaturesPath);
+  const postResponse = await postFeaturesToService(originalFeaturesPath);
   // wait for job to finish, 1sec
-  await new Promise((resolve) => setTimeout(resolve, 1000)).then(() => {
-    if (!jobId) {
-      // 1 sec should be enough for the job to finish
-      throw new Error("JobId not found, aborting");
-    }
-  });
+  const jobId = postResponse.body;
+  const jobResponse = await awaitJobCompletion(jobId);
+  const collectionId = JSON.parse(jobResponse.body).job_collection;
   // get collectionId and featureId from database
-  const { collectionId, featureIds } = await getFeatureIdsFromService(jobId[0]);
+  const featureIds = await getFeatureIdsFromService(collectionId);
 
   // add collectionId to mutated properties
   const mutatedFeaturesWithId = {
