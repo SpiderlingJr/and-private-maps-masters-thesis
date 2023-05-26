@@ -511,8 +511,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
     async getPatchDelta(collectionId: string) {
       const queryRunner = conn.createQueryRunner();
 
-      const deltaPolyTimer =
-        fastify.performanceMeter.startTimer("getPatchDelta");
       // TODO reduce select to  collectionId in patch_features
       const deltaPolys: GeometryDump[] = await queryRunner.query(
         `SELECT 
@@ -546,7 +544,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           ) AS tmp2
         `
       );
-      deltaPolyTimer.stop(true);
+
       if (!deltaPolys) {
         // TODO how does this handle if patch set is identical
         throw new Error("Error while calculating delta polygons");

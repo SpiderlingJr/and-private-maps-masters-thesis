@@ -64,6 +64,12 @@ const performanceMeterPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.addHook("onClose", async () => {
     console.log("stopping filesPlugin");
+    if (timers.size > 0) {
+      fastify.log.warn(
+        `performanceMeterPlugin closing with ${timers.size} active timers`
+      );
+      fastify.log.warn(`active timers: ${Array.from(timers.keys())}`);
+    }
   });
 };
 

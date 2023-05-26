@@ -9,6 +9,7 @@ import {
   parsePolyPoints,
   rasterize,
 } from "./eviction/evictionUtil";
+const MAXTRACE = 50;
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -74,6 +75,15 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
       throw e;
     }
   }
+
+  function logMvts(mvts: Array<string>) {
+    for (let i = 0; i < MAXTRACE; i++) {
+      fastify.log.info(mvts[i]);
+      if (i === MAXTRACE - 1) {
+        fastify.log.info("...");
+      }
+    }
+  }
   /* Pseudo 
       N = tables.patch_features(collection_id)
       E = tables.features(collection_id)
@@ -101,12 +111,27 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           - existing data resides in table 'features'
           - patch data resides in table 'patch_features'
           */
-          const deltaPolys = await fastify.db.getPatchDelta(collectionId);
-          fastify.log.debug("Delta Polys:", deltaPolys);
+          const patchDeltaTimer = fastify.performanceMeter.startTimer(
+            `raster-bo-evict-${collectionId}-delta`
+          );
+          const deltaPolys = await fastify.db
+            .getPatchDelta(collectionId)
+            .catch((e) => {
+              fastify.log.error("Error trying to get patch delta", e);
+              patchDeltaTimer.stop(false);
+              throw e;
+            });
+          patchDeltaTimer.stop(true);
+
+          const rasterTimer = fastify.performanceMeter.startTimer(
+            `raster-bo-evict-${collectionId}-raster`
+          );
+          fastify.log.debug(`Delta Polys: ${deltaPolys.toString()}`);
           const points = parsePolyPoints(deltaPolys);
-          fastify.log.debug("Delta Poly Points:", points);
+          fastify.log.debug(`Delta Poly Points: ${points.toString()}`);
 
           const mvts = rasterize(points, maxZoom);
+          rasterTimer.stop(true);
 
           // Set of MVTs formatted as string in the form of z/x/y
           // TODO remove fmtMvts, use mvtStrings instead
@@ -118,43 +143,16 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           for (const m of mvts) {
             mvtStrings.add(`${m[0]}/${m[1]}/${m[2]}`);
           }
+          const findMvtParentsTimer = fastify.performanceMeter.startTimer(
+            `raster-bo-evict-${collectionId}-parents`
+          );
           const parentMvtStrings = findMvtParents(maxZoom, fmtMvts);
-          if (fastify.log.level === "trace") {
-            const maxTrace = 50;
-            fastify.log.trace("MVTs");
-            let i = 0;
-            mvts.forEach((m) => {
-              i++;
-              fastify.log.trace(`${m[0]}/${m[1]}/${m[2]}`);
-              if (i >= maxTrace) {
-                fastify.log.trace("...");
-                return;
-              }
-            });
-            let j = 0;
-            fastify.log.debug(
-              "Evicting",
-              parentMvtStrings.size,
-              "parent tiles"
-            );
-            parentMvtStrings.forEach((m) => {
-              j++;
-              fastify.log.debug(m);
-              if (j >= maxTrace) {
-                fastify.log.debug("...");
-                return;
-              }
-            });
-          }
+          findMvtParentsTimer.stop(true);
 
-          fastify.log.debug("Evicting", mvtStrings.size, "tiles");
-          mvtStrings.forEach((m) => {
-            fastify.log.debug(m);
-          });
-          fastify.log.debug("Evicting", parentMvtStrings.size, "parent tiles");
-          parentMvtStrings.forEach((m) => {
-            fastify.log.debug(m);
-          });
+          fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
+          logMvts(Array.from(mvtStrings));
+          fastify.log.debug(`Evicting ${parentMvtStrings.size} parent tiles`);
+          logMvts(Array.from(parentMvtStrings));
 
           await evictEntries(parentMvtStrings);
           await evictEntries(mvtStrings);
@@ -179,34 +177,25 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
          * 6. Return all intersecting MVTs in form of z/x/y
          */
         async evict(collectionId: string) {
+          const getMvtStringsTimer = fastify.performanceMeter.startTimer(
+            `boxcut-bo-evict-${collectionId}`
+          );
           const mvtStrings = await fastify.db.getPatchedMVTStringsBoxcut(
             collectionId,
             maxZoom
           );
+          getMvtStringsTimer.stop(true);
+
+          const findMvtParentsTimer = fastify.performanceMeter.startTimer(
+            `boxcut-bo-evict-${collectionId}-parents`
+          );
           const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
+          findMvtParentsTimer.stop(true);
 
           fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
-          let i = 0;
-          mvtStrings.forEach((m) => {
-            i++;
-            if (i < 50) {
-              fastify.log.trace(m);
-            } else {
-              fastify.log.trace("...");
-              return;
-            }
-          });
+          logMvts(Array.from(mvtStrings));
           fastify.log.metric(`Evicting ${parentMvtStrings.size} parent tiles`);
-          i = 0;
-          parentMvtStrings.forEach((m) => {
-            i++;
-            if (i < 50) {
-              fastify.log.trace(m);
-            } else {
-              fastify.log.trace("...");
-              return;
-            }
-          });
+          logMvts(Array.from(parentMvtStrings));
 
           await evictEntries(parentMvtStrings);
           await evictEntries(mvtStrings);
