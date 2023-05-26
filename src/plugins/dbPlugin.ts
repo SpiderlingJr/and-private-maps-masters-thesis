@@ -488,7 +488,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       return mvtResponse;
     },
     async patchCollection(collectionId: string) {
-      console.debug("Patching collection", collectionId);
+      fastify.log.debug("Patching collection", collectionId);
       const queryRunner = conn.createQueryRunner();
       const updateResult = await queryRunner.query(
         `UPDATE features 
