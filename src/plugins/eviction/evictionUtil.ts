@@ -249,23 +249,32 @@ export function rasterize(
  * Takes a set of MVT Coordinates and a zoom level and returns the set of their parents
  * @param mvt set of MVT coordinates in format [x, y]
  * @param zoom zoom level
+ * @param keepBottomLayer controls wether the bottom layer should be kept or not,
+ * default true. This controls whether the mvt-Set is included in the returned set
  * @returns the MVT keys in format "z/x/y"
  */
-export function findMvtParents(zoom: number, mvt: Set<string>): Set<string> {
+export function findMvtParents(
+  zoom: number,
+  mvt: Set<string>,
+  keepBottomLayer = false
+): Set<string> {
   if (zoom === 0) {
     return new Set<string>(["0/0/0"]);
   }
   const parents = new Set<string>();
 
-  // TODO laufzeit messen?
-  // TODO getParent-lookup table? inMemory, wenn möglich für konstante lookup time
   for (const m of mvt) {
     const [z, x, y] = m.split("/");
     const parent = calcMvtParent(parseInt(z), parseInt(x), parseInt(y));
 
     parents.add(parent);
   }
-  return new Set([...mvt, ...findMvtParents(zoom - 1, parents)]);
+
+  if (keepBottomLayer) {
+    return new Set([...mvt, ...findMvtParents(zoom - 1, parents)]);
+  } else {
+    return findMvtParents(zoom - 1, parents, true);
+  }
 }
 /**
  * Takes coordinates of a MVT and a zoom level and returns the coordinates of its parent
