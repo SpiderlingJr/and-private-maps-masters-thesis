@@ -197,8 +197,8 @@ interface PostgresDB {
    *
    * @param collId: uuid of updated collection, must exist in features and
    *  patch_features table
-   * @param mvtTable name of table contaning mvt geometries witht their z/x/y
-   *  positions, usually named 'mvt<zoomlevel>'
+   * @param zoomLevel: zoom level of mvt tiles to be evicted
+   * @returns set of mvt strings in form of z/x/y
    */
 
   getPatchedMVTStringsBoxcut(
@@ -268,6 +268,15 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
   conn = await connectDB();
 
   fastify.decorate("db", {
+    async createCollection() {
+      const coll = Collections.create({});
+      await coll.save();
+      return coll.coll_id;
+    },
+    async listCollections() {
+      const colls = await Collections.find();
+      return colls;
+    },
     async createJob() {
       const job = Jobs.create({});
       await job.save();
@@ -314,15 +323,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         return res;
       }
       // TODO might be handled more generally later. for now, only maxZoom and minZoom are of updated
-    },
-    async createCollection() {
-      const coll = Collections.create({});
-      await coll.save();
-      return coll.coll_id;
-    },
-    async listCollections() {
-      const colls = await Collections.find();
-      return colls;
     },
     async copyToFeatures(file: string) {
       const copyQuery = `COPY features(geom, properties, ft_collection) 
@@ -490,8 +490,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
     },
     async getPatchDelta(collectionId: string) {
       const queryRunner = conn.createQueryRunner();
-
-      // TODO reduce select to  collectionId in patch_features
       const deltaPolys: GeometryDump[] = await queryRunner.query(
         `SELECT 
           tmp2.featid AS featId, 
