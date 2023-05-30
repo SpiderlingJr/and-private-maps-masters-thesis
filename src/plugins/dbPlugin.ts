@@ -111,26 +111,6 @@ interface PostgresDB {
    * @param collectionId uuid of collection to be patched
    */
   patchCollection(collectionId: string): Promise<unknown>;
-  /** Patches features of a collection in db. Passed features and collection must already exist.
-   * Calculates the difference between existing and patched features and returns the difference.
-   *
-   * First copies all features to a temporary table (patch_features) and calculates the Difference
-   * between the Union and Intersection of both existing and patched features, using the postgis
-   * ST_Difference, ST_Union and ST_Intersection functions. Then, the resulting multipolygon is
-   * returned as a point cloud (ST_DumpPoints). Finally, the new features are updated in the db
-   * and the temporary table entries are deleted.
-   *
-   * Passed features are assumed to be valid and must be formatted as csv with the following columns:
-   * - feature_id: uuid (must already exist in db)
-   * - geom:  Geometry in WKT format
-   * - properties: properties as json, can be {}
-   * - ft_collection, uuid of collection to which feature belongs
-   *
-   * @deprecated
-   * @param patchPath path to csv file containing features to be patched
-   * @returns diff between existing and patched features
-   */
-  patchAndGetDiff(patchPath: string): Promise<GeometryDump[]>;
   /** Compares features in the tables features and patch_features and returns
    * their difference, as a point cloud (ST_DumpPoints).
    *
@@ -550,110 +530,6 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         throw new Error("Error while calculating delta polygons");
       }
       return deltaPolys;
-    },
-    /**
-     * @deprecated
-     * @param patchPath
-     * @returns
-     */
-    async patchAndGetDiff(patchPath: string) {
-      // Query to copy features from csv to db
-      const copyQuery = pgcopy.from(
-        "COPY patch_features(feature_id, geom, properties, ft_collection) \
-      FROM STDIN (FORMAT CSV, DELIMITER ';')"
-      );
-      const queryRunner = conn.createQueryRunner();
-      queryRunner.startTransaction();
-      const pgConn = await (<PostgresQueryRunner>queryRunner).connect();
-      const copyTimer = fastify.performanceMeter.startTimer("copyStreamPatch");
-      try {
-        // Copies csv file to db
-        await pipeline(createReadStream(patchPath), pgConn.query(copyQuery));
-        copyTimer.stop(true);
-      } catch (e) {
-        copyTimer.stop(false);
-        fastify.log.error(e);
-        throw e;
-      }
-      const deltaPolyTimer =
-        fastify.performanceMeter.startTimer("deltaPolyQuery");
-      let featIds;
-      /* Let db calculate difference between existing and patched features
-      and return as geometry dump */
-      try {
-        // TODO assert that all features in patch data are contained in existing features
-        // Query to get difference between existing and patched features `
-        const deltaPolys: GeometryDump[] = await queryRunner.query(
-          `SELECT 
-            tmp2.featid AS featId, 
-            (ST_DumpPoints(diffpoly)).path AS path, 
-            ST_AsText(
-              ST_Transform(
-                ST_SetSRID(
-                  (ST_DumpPoints(diffpoly)).geom,
-                4326),
-              3857)
-            ) AS geom 
-            FROM (
-              SELECT 
-                featId,
-                St_AsText(ST_Difference(g_union, g_inter)) AS diffpoly         
-              FROM ( 
-                SELECT 
-                  og.feature_id AS featId,
-                  ST_Union(og.geom, pg.geom) AS g_union, 
-                  ST_Intersection(og.geom, pg.geom) AS g_inter
-                FROM features AS og JOIN patch_features AS pg
-                ON og.feature_id = pg.feature_id
-              ) AS tmp
-            ) AS tmp2
-          `
-        );
-        deltaPolyTimer.stop(true);
-        featIds = deltaPolys.map((d) => d.featid);
-
-        if (!deltaPolys) {
-          // TODO how does this handle if patch set is identical
-          throw new Error("Error while calculating delta polygons");
-        }
-
-        const updateResult = await queryRunner.query(
-          `UPDATE features 
-            SET geom = patch_features.geom, 
-                properties = patch_features.properties, 
-                ft_collection = patch_features.ft_collection
-          FROM patch_features
-          WHERE features.feature_id = patch_features.feature_id`
-        );
-        if (!updateResult) {
-          // TODO construct a scenario where this happens
-          throw new Error(
-            "Error while updating features: could not receive update result"
-          );
-        }
-        await queryRunner.commitTransaction();
-        return deltaPolys;
-      } catch (err) {
-        await queryRunner.rollbackTransaction();
-        fastify.log.error(
-          "Error while trying to receive delta poly, rolling back transaction\n",
-          err
-        );
-        deltaPolyTimer.stop(false);
-        throw err;
-      } finally {
-        // delete feature from patch table
-        await queryRunner.release();
-        if (featIds) {
-          await PatchFeatures.delete({ feature_id: In(featIds) }).then(
-            (res) => {
-              fastify.log.debug(
-                `Deleted ${res.affected} features from patch_features`
-              );
-            }
-          );
-        }
-      }
     },
     async getPatchedMVTStringsBoxcut(collId: string, zoomLevel: number) {
       const mvtStrings = new Set<string>();
