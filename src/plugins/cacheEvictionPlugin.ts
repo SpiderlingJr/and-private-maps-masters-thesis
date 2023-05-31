@@ -23,6 +23,7 @@ export enum EvictionStrategy {
   BOXCUT_TOP_DOWN,
   RASTER_BO,
   RASTER_BOTTOM_UP,
+  EXACT,
 }
 interface Evictor {
   /**
@@ -206,6 +207,39 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
     case EvictionStrategy.BOXCUT_TD:
     case EvictionStrategy.BOXCUT_TOP_DOWN:
       throw new Error("Not implemented");
+    case EvictionStrategy.EXACT:
+      fastify.log.info(
+        `Using Eviction Strategy: EXACT with Max Zoom ${maxZoom}`
+      );
+      fastify.decorate("evictor", {
+        async evict(collectionId: string) {
+          const getMvtStringsTimer = fastify.performanceMeter.startTimer(
+            `exact-evict-${collectionId}`
+          );
+          const mvtStrings = await fastify.db.getPatchedMVTStringsExact(
+            collectionId,
+            maxZoom
+          );
+          getMvtStringsTimer.stop(true);
+
+          const findMvtParentsTimer = fastify.performanceMeter.startTimer(
+            `exact-evict-parents-${collectionId}`
+          );
+          const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
+          findMvtParentsTimer.stop(true);
+
+          fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
+          logMvts(Array.from(mvtStrings));
+          fastify.log.metric(`Evicting ${parentMvtStrings.size} parent tiles`);
+          logMvts(Array.from(parentMvtStrings));
+
+          await evictEntries(parentMvtStrings);
+          await evictEntries(mvtStrings);
+          return;
+        },
+      } satisfies Evictor);
+      break;
+
     default:
       throw new Error("Invalid eviction strategy");
   }
