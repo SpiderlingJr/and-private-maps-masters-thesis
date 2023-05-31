@@ -42,7 +42,7 @@ export class PatchFeatures extends BaseEntity {
   @JoinColumn({ name: "ft_collection" })
   ft_collection: Collections;
 
-  @Column({ type: "geometry" })
+  @Column({ type: "geometry", srid: 4326 })
   geom: Geometry;
 
   @Column({ type: "jsonb", nullable: true })

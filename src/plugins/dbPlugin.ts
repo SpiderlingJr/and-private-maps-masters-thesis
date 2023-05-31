@@ -576,7 +576,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
             SELECT ST_Union(E.geom, N.geom) as union_geom
             FROM E, N
           ) as uni JOIN mvt${zoomLevel}
-          ON ST_Intersects(union_geom, mvt${zoomLevel}.geom)
+          ON ST_Intersects(ST_SetSRID(union_geom, 4326), mvt${zoomLevel}.geom)
           ORDER BY x asc, y asc
       `
       );
@@ -617,7 +617,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           )
           SELECT x, y
           FROM D JOIN mvt${zoomLevel}
-          ON ST_Intersects(D.geom, mvt${zoomLevel}.geom)
+          ON ST_Intersects(ST_SetSrid(D.geom, 4326), mvt${zoomLevel}.geom)
           ORDER BY x asc, y asc
       `
       );
