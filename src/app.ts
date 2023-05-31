@@ -38,6 +38,11 @@ const customLogLevels = {
   metric: 99,
 };
 
+// get log level from env as string applied to customLogLevels
+const logLevel = process.env.LOG_LEVEL?.toLowerCase() as
+  | keyof typeof customLogLevels
+  | undefined;
+
 const loggerTransports = {
   targets: [
     {
@@ -47,7 +52,7 @@ const loggerTransports = {
         translateTime: "HH:MM:ss Z",
         ignore: "pid,hostname",
       },
-      level: "info",
+      level: logLevel as keyof typeof customLogLevels,
     },
     {
       target: "pino-pretty",
