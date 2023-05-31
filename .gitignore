@@ -7,8 +7,8 @@ storage
 storage/*
 inputs
 package-lock.json
-test/data/*
 test/data/dynamic/**
+test/data/static/unused
 **/*.log
 test/data/[a-z0-9]*_[12go]*_[0-9]*f.[ndgeo]*json
 
