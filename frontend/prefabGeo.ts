@@ -252,3 +252,49 @@ console.log(
   "bigQuadrangleJSON",
   JSON.stringify(turf.toWgs84(bigQuadrangle.geometry))
 );
+
+/** Polygon over Africa in an upside down L shape
+ * Includes the island of Madagascar
+ *
+ * On zoom level 3 the polygon resides in the following tiles:
+ * 3/3/3, 3/4/3, 3/5/3,
+ *        3/4/4, 3/5/4
+ *
+ *
+ *
+ */
+export const africaL = turf.polygon([
+  [
+    [50.69002933248774, -37.49017283962983],
+    [50.69002933248774, 38.757972249286865],
+    [-38.98728734447511, 38.88055121812829],
+    [-38.82995871872632, 0.884461322813209],
+    [8.053971754493006, 1.3563556266067849],
+    [8.211300380242562, -37.61490210257571],
+    [50.69002933248774, -37.49017283962983],
+  ],
+]);
+
+/**
+ * Polygon over Africa in an upside down L shape
+ * Includes the island of Madagascar
+ * Introduces a small patch in the west coast of Africa, reducing the size of the
+ * included sea area, fitting into the curved shape of the continent.
+ *
+ * On zoom level 3 the polygon resides in the following tiles:
+ * 3/3/3, 3/4/3, 3/5/3, (<- differ from africaL)
+ *        3/4/4, 3/5/4  (<- unchanged)
+ */
+export const africaLWestCoastPatch = turf.polygon([
+  [
+    [50.69002933248774, -37.49017283962983],
+    [50.69002933248774, 38.757972249286865],
+    [7.589744617279116, 37.95184981777541],
+    [-12.2485490256865, 35.49063206644619],
+    [-24.219843573895673, 22.11622100366675],
+    [-13.084946127539354, 3.627346479329759],
+    [8.053971754493006, 1.3563556266067849],
+    [8.211300380242562, -37.61490210257571],
+    [50.69002933248774, -37.49017283962983],
+  ],
+]);
