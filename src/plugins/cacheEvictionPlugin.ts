@@ -9,8 +9,8 @@ import {
   parsePolyPoints,
   rasterize,
 } from "./eviction/evictionUtil";
-const MAXTRACE = 50;
-
+const MAX_TRACE = 20;
+const DEFAULT_MAX_ZOOM = 9;
 declare module "fastify" {
   interface FastifyInstance {
     evictor: Evictor;
@@ -45,7 +45,9 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
   strategy?: EvictionStrategy;
 }> = async (fastify, options) => {
   // Deepest considered zoom level
-  const maxZoom = process.env.MAX_ZOOM ? parseInt(process.env.MAX_ZOOM) : 9;
+  const maxZoom = process.env.MAX_ZOOM
+    ? parseInt(process.env.MAX_ZOOM)
+    : DEFAULT_MAX_ZOOM;
   let strategy: EvictionStrategy;
 
   if (options.strategy === undefined) {
@@ -78,9 +80,14 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
   }
 
   function logMvts(mvts: Array<string>) {
-    for (let i = 0; i < MAXTRACE; i++) {
+    if (fastify.log.level !== "info") {
+      return;
+    }
+    const numLoggedMvts = Math.min(mvts.length, MAX_TRACE);
+
+    for (let i = 0; i < numLoggedMvts; i++) {
       fastify.log.info(mvts[i]);
-      if (i === MAXTRACE - 1) {
+      if (i === MAX_TRACE - 1) {
         fastify.log.info("...");
       }
     }
