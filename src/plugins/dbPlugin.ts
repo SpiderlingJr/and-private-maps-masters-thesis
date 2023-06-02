@@ -173,7 +173,8 @@ interface PostgresDB {
     y: number,
     extent?: number,
     buffer?: number,
-    name?: string
+    name?: string,
+    debug?: boolean
   ): Promise<MVTResponse[]>;
   /*
    * Job operations *
@@ -244,6 +245,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       conn = new DataSource({
         type: "postgres",
         host: "localhost",
+        //logging: ["query", "error"],
         port: Number(process.env.POSTGRES_EXPOSE),
         username: process.env.POSTGRES_USER,
         password: process.env.POSTGRES_PASSWORD,
