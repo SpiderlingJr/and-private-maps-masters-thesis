@@ -158,7 +158,12 @@ export default async function (
             app.files.deleteFile(`./storage/validated/${jobId}.csv`);
           });
         // Find all mvts that are affected by the patch
+
+        const totalEvictionTimer = app.performanceMeter.startTimer(
+          `patchJob-${jobId}-total`
+        );
         await app.evictor.evict(collId).then(async () => {
+          totalEvictionTimer.stop(true);
           fastify.log.debug("eviction done");
           // Apply patch to database
           await app.db.patchCollection(collId);

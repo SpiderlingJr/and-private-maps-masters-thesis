@@ -113,7 +113,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           - patch data resides in table 'patch_features'
           */
           const patchDeltaTimer = fastify.performanceMeter.startTimer(
-            `raster-bo-evict-${collectionId}-delta`
+            `raster-bo-evict-patchDelta-${collectionId}`
           );
           const deltaPolys = await fastify.db
             .getPatchDelta(collectionId)
@@ -125,7 +125,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           patchDeltaTimer.stop(true);
 
           const rasterTimer = fastify.performanceMeter.startTimer(
-            `raster-bo-evict-${collectionId}-raster`
+            `raster-bo-evict-rasterize-${collectionId}`
           );
           fastify.log.debug(`Delta Polys: ${deltaPolys.toString()}`);
           const points = parsePolyPoints(deltaPolys);
@@ -145,7 +145,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
             mvtStrings.add(`${m[0]}/${m[1]}/${m[2]}`);
           }
           const findMvtParentsTimer = fastify.performanceMeter.startTimer(
-            `raster-bo-evict-${collectionId}-parents`
+            `raster-bo-evict-parents-${collectionId}`
           );
           const parentMvtStrings = findMvtParents(maxZoom, fmtMvts);
           findMvtParentsTimer.stop(true);
@@ -188,7 +188,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           getMvtStringsTimer.stop(true);
 
           const findMvtParentsTimer = fastify.performanceMeter.startTimer(
-            `boxcut-bo-evict-${collectionId}-parents`
+            `boxcut-bo-evict-parents-${collectionId}`
           );
           const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
           findMvtParentsTimer.stop(true);
