@@ -1,6 +1,7 @@
 .DS_Store
 .nyc_output
 .env
+debug/
 node_modules
 coverage
 storage

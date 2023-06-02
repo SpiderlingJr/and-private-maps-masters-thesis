@@ -1,10 +1,9 @@
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import pgcopy from "pg-copy-streams";
-
 import { pipeline } from "stream/promises";
 import { createReadStream } from "fs";
-import { DataSource, DeleteResult, In, UpdateResult } from "typeorm";
+import { DataSource, DeleteResult, UpdateResult } from "typeorm";
 import { TmpFeatures, Features, PatchFeatures } from "src/entities/features.js";
 import { Collections } from "src/entities/collections.js";
 import { Jobs, JobState } from "src/entities/jobs.js";
@@ -25,7 +24,9 @@ import {
   MVT12,
   MVT13,
 } from "src/entities/mvts.js";
-
+//@ts-expect-error no types
+import vt from "vector-tile";
+import Protobuf from "pbf";
 /* TODO Consider path length behavior in DumpPoints when querying more than 1 
 polygon
 https://postgis.net/docs/ST_DumpPoints.html
@@ -275,6 +276,56 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       throw new Error("Error while trying to connect to database:\n" + err);
     }
   }
+  /** Logs a vector tile as geojson to console, pastable to geojson.io
+   *
+   * @param mvtBuffer vector tile buffer as received from postgis
+   * @param {Object} options logging options
+   * @param {string} options.name name of the vector tile (default: "default")
+   * @param {string} options.collId collection id of the vector tile (default: "anyCollection")
+   * @param {number} options.x x coordinate of the vector tile
+   * @param {number} options.y y coordinate of the vector tile
+   * @param {number} options.z z coordinate of the vector tile
+   */
+  function logMvtAsGeojson(
+    mvtBuffer: Buffer,
+    {
+      name = "default",
+      collId = "anyCollection",
+      x,
+      y,
+      z,
+    }: {
+      name?: string;
+      collId?: string;
+      x: number;
+      y: number;
+      z: number;
+    }
+  ) {
+    try {
+      const tile = new vt.VectorTile(new Protobuf(mvtBuffer));
+      const layers = [name];
+
+      const collection = {
+        type: "FeatureCollection",
+        features: [] as any[],
+      };
+      layers.forEach(function (layerID) {
+        const layer = tile.layers[layerID];
+        if (layer) {
+          for (let i = 0; i < layer.length; i++) {
+            const feature = layer.feature(i).toGeoJSON(x, y, z);
+            if (layers.length > 1) feature.properties.vt_layer = layerID;
+            collection.features.push(feature);
+          }
+        }
+      });
+      console.log(`${collId}: ${z}/${x}/${y}`);
+      console.dir(JSON.stringify(collection));
+    } catch (e) {
+      console.error(e);
+    }
+  }
   function isJobState(value: string): value is JobState {
     return ["pending", "finished", "error"].includes(value);
   }
@@ -459,7 +510,8 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       y: number,
       extent = 4096,
       buffer = 64,
-      name = "default"
+      name = "default",
+      debug = false
     ) {
       if (extent < 1) throw new Error("Extent must be > 1");
 
@@ -489,6 +541,15 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       `;
 
       const mvtResponse = await Features.query(mvt_tmpl);
+
+      if (debug) {
+        logMvtAsGeojson(mvtResponse[0].st_asmvt, {
+          collId: collId,
+          x: x,
+          y: y,
+          z: z,
+        });
+      }
       fastify.log.debug(`Received: ${z}/${x}/${y}`);
 
       return mvtResponse;
