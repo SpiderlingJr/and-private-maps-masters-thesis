@@ -23,7 +23,7 @@ export class Features extends BaseEntity {
   @JoinColumn({ name: "ft_collection" })
   ft_collection: Collections;
 
-  @Column({ type: "geometry", srid: 4326 })
+  @Column({ type: "geometry", spatialFeatureType: "GEOMETRY", srid: 4326 })
   geom: Geometry;
 
   @Column({ type: "jsonb", nullable: true })
@@ -42,7 +42,7 @@ export class PatchFeatures extends BaseEntity {
   @JoinColumn({ name: "ft_collection" })
   ft_collection: Collections;
 
-  @Column({ type: "geometry", srid: 4326 })
+  @Column({ type: "geometry", spatialFeatureType: "GEOMETRY", srid: 4326 })
   geom: Geometry;
 
   @Column({ type: "jsonb", nullable: true })
@@ -54,7 +54,12 @@ export class TmpFeatures extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   feature_id: string;
 
-  @Column({ type: "geometry", nullable: true })
+  @Column({
+    type: "geometry",
+    spatialFeatureType: "GEOMETRY",
+    srid: 4326,
+    nullable: true,
+  })
   geom: Geometry;
 
   @Column({ type: "jsonb", nullable: true })
