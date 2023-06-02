@@ -1,0 +1,91 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "description": "big triangle polygon, should have holes in raster method on zoom 3",
+        "in": "rasterStress",
+        "name": "smallTriangle"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [-243.4199276471034, 81.53169907031156],
+            [-244.17227875495084, 35.32770751760431],
+            [-107.24437712673905, 35.02021981385312],
+            [-243.4199276471034, 81.53169907031156]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "description": "biggest polygon, not very complex",
+        "in": "rasterStress",
+        "name": "bigPoly"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [-257.33842314227866, 25.281490078186707],
+            [-256.5860720344317, -60.17117772577116],
+            [-0.7866953663437073, -54.06078992989531],
+            [-0.7866953663437073, -9.547975961792119],
+            [68.80578210953314, -11.028441394614347],
+            [69.18195766345659, 38.92555103036443],
+            [0.7180068493507576, 39.50843446186633],
+            [0.7180068493507576, 73.10840878962776],
+            [-206.9308989165083, 84.43123760207868],
+            [-219.7208677499131, 82.17120146959772],
+            [-77.90268392069363, 41.7913095768416],
+            [-109.87760600420445, 24.256803709975784],
+            [-257.33842314227866, 25.281490078186707]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "description": "bigger triangle, intersects with big polygon. shares point with quadrangular poly",
+        "in": "rasterStress",
+        "name": "bigTriangle"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [46.31503548354547, -81.69627980666924],
+            [36.15829552760644, 16.145612657330105],
+            [-154.93888586561195, -82.27301813592852],
+            [46.31503548354547, -81.69627980666924]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "description": "quadrangular polygon, intersecting with the big one. shares a point with the second triangle",
+        "in": "rasterStress",
+        "name": "quadrangle1"
+      },
+      "geometry": {
+        "coordinates": [
+          [
+            [20.7350978167363, 82.80992550955179],
+            [36.15829552760644, 16.145612657330105],
+            [73.39967536604709, 35.63403006084913],
+            [72.27114870427613, 82.27301813592868],
+            [20.7350978167363, 82.80992550955179]
+          ]
+        ],
+        "type": "Polygon"
+      }
+    }
+  ]
+}
