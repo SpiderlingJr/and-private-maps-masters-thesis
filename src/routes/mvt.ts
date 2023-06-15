@@ -66,7 +66,6 @@ export default async function (
       }
 
       if (cachedMvt) {
-        app.log.debug(`Tile ${zxy_key} already cached.`);
         //const mvt = Buffer.from(cachedMvt, "base64");
         //reply.send(mvt);
         console.debug(`Cache hit for ${zxy_key}`);

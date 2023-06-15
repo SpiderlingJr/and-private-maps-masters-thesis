@@ -1,7 +1,7 @@
 import { randomGeometries as rg } from "./RandomGeometries";
 import { writeFileSync } from "fs";
 import { FeatureCollection, featureCollection as fc } from "@turf/turf";
-import { prepUpdate } from "./PrepUpdateSet";
+import prepUpdate from "./PrepUpdateSet";
 import path from "path";
 import { awaitJobCompletion } from "../injects";
 
@@ -14,7 +14,7 @@ const NUM_FEATURES = 3;
 const STORE_PATH = "outgeos";
 
 // write file as ndjson
-function writeAsNdjson(features: FeatureCollection, path) {
+function writeAsNdjson(features: FeatureCollection, path: string) {
   let ndjson = "";
   for (const feature of features.features) {
     ndjson += JSON.stringify(feature) + "\n";
