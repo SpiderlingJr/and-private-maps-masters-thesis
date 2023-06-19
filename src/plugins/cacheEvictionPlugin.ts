@@ -17,13 +17,14 @@ declare module "fastify" {
   }
 }
 export enum EvictionStrategy {
-  BOXCUT_BO,
-  BOXCUT_BOTTOM_UP,
-  BOXCUT_TD,
-  BOXCUT_TOP_DOWN,
-  RASTER_BO,
-  RASTER_BOTTOM_UP,
-  EXACT,
+  BOXCUT_BO = "BOXCUT_BO",
+  BOXCUT_BOTTOM_UP = "BOXCUT_BO",
+  BOXCUT_TD = "BOXCUT_TD",
+  BOXCUT_TOP_DOWN = "BOXCUT_TD",
+  RASTER_BO = "RASTER_BO",
+  RASTER_BOTTOM_UP = "RASTER_BO",
+  EXACT = "EXACT",
+  CLUSTER_BOXCUT = "CLUSTER_BOXCUT",
 }
 interface Evictor {
   /**

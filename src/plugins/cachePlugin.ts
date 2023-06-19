@@ -23,8 +23,8 @@ interface Cache<T = Map<string, string> | FastifyRedis> {
 }
 
 export enum CacheStrategy {
-  REDIS,
-  JSMAP,
+  REDIS = "REDIS",
+  JSMAP = "JSMAP",
 }
 /**
  * @param fastify Will be passed in if called from fastify.register()

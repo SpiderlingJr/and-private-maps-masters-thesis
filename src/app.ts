@@ -82,18 +82,18 @@ const app = fastify({
 
 // Register plugins
 app.register(cachePlugin, {
-  strategy: process.env.CACHE_STRATEGY?.toUpperCase() as
-    | CacheStrategy
-    | undefined,
+  strategy:
+    (process.env.CACHE_STRATEGY?.toUpperCase() as CacheStrategy) ??
+    CacheStrategy[CacheStrategy.JSMAP],
 });
 app.register(dbPlugin);
 app.register(filesPlugin);
 app.register(validatorPlugin);
 // TODO make cache eviction strategy configurable
 app.register(cacheEvictionPlugin, {
-  strategy: process.env.EVICTION_STRATEGY?.toUpperCase() as
-    | EvictionStrategy
-    | undefined,
+  strategy:
+    (process.env.EVICTION_STRATEGY?.toUpperCase() as EvictionStrategy) ??
+    EvictionStrategy[EvictionStrategy.BOXCUT_BO],
 });
 app.register(performanceMeterPlugin);
 
