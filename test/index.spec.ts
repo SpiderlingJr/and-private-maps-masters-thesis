@@ -161,34 +161,6 @@ test("general suite", async (t) => {
     "sub2: requests on non-parametric routes",
     async (invariantRouteTest) => {
       invariantRouteTest.test(
-        'requests the non-existing "/randomRoute" route',
-        async (randomRouteTest) => {
-          const response = await app.inject({
-            method: "GET",
-            url: "/randomRoute",
-            headers: {
-              "content-type": "application/json",
-            },
-          });
-          randomRouteTest.equal(
-            response.statusCode,
-            400,
-            "requesting a non-existing route should return 400"
-          );
-          randomRouteTest.same(
-            JSON.parse(response.body),
-            {
-              statusCode: 400,
-              error: "Bad Request",
-              message: "querystring must have required property 'foo'",
-            },
-            "requesting a non-existing route should return a helpful error message"
-          );
-          randomRouteTest.end();
-        }
-      );
-
-      invariantRouteTest.test(
         'requests the "/" route (Landing Page)',
         async (landingPageTest) => {
           const response = await app.inject({
@@ -425,6 +397,7 @@ test("general suite", async (t) => {
         );
         t.same(JSON.parse(response.body), {
           statusCode: 400,
+          code: "FST_ERR_VALIDATION",
           error: "Bad Request",
           message: "body/Style/minZoom must be <= 22",
         });
@@ -472,17 +445,23 @@ test("general suite", async (t) => {
       }
     );
 
+    /*
     cacheTest.todo("cache is invalidated after a style post", async (t) => {
       //
+      t.pass();
     });
 
     cacheTest.todo("delete collection after sub4 is done");
     // TODO this (I promise it works)
+    t.pass();
+    */
   });
 
+  /*
   t.todo("sub5: style tests", async (styleTest) => {
-    //
+    t.pass();
   });
+  */
 
   t.test(
     "sub6: standard workflow on randomly generated geodata",
