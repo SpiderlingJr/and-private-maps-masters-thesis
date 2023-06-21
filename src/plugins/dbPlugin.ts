@@ -80,6 +80,15 @@ export interface GeometryDump {
 interface MVTResponse {
   st_asmvt: string;
 }
+
+interface ClusteredTiles {
+  /** Cluster number */
+  cluster_id: number;
+  /** Vector tile x coordinate */
+  tile_x: number;
+  /** Vector tile y coordinate */
+  tile_y: number;
+}
 declare module "fastify" {
   interface FastifyInstance {
     db: PostgresDB;
@@ -230,6 +239,10 @@ interface PostgresDB {
   getPatchedMVTStringsExact(
     collId: string,
     zoomLevel: number
+  ): Promise<Set<string>>;
+  getPatchedMVTStringsClusterBoxcut(
+    collectionId: string,
+    maxZoom: number
   ): Promise<Set<string>>;
 }
 /**
@@ -688,6 +701,130 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       for (const row of deltaMvts) {
         const { x, y } = row;
         mvtStrings.add(`${zoomLevel}/${x}/${y}`);
+      }
+      return mvtStrings;
+    },
+    async getPatchedMVTStringsClusterBoxcut(collId: string, zoomLevel: number) {
+      const mvtStrings = new Set<string>();
+      const queryRunner = conn.createQueryRunner();
+      const mvtResult: ClusteredTiles[] = await queryRunner.query(
+        `
+        WITH
+            E AS (
+                SELECT
+                    ST_Union (geom) as geom
+                FROM
+                    features
+                WHERE
+                    ft_collection = '${collId}'
+            ),
+            N AS (
+                SELECT
+                    ST_Union (geom) as geom
+                FROM
+                    patch_features
+                WHERE
+                    ft_collection = '${collId}'
+            ),
+            U AS (
+                SELECT
+                    ST_Union (E.geom, N.geom) as geom
+                FROM
+                    E,
+                    N
+            ),
+            I AS (
+                SELECT
+                    ST_Intersection (E.geom, N.geom) as geom
+                FROM
+                    E,
+                    N
+            ),
+            D AS (
+                SELECT
+                    --ST_Difference (U.geom, I.geom) as geom
+                    (ST_Dump(ST_Difference (U.geom, I.geom))).geom
+                FROM
+                    U,
+                    I
+            ),
+            /*
+            Build clusters from change set
+            */
+            clusters AS (
+                SELECT
+                    CASE
+                        WHEN cluster_id IS NULL THEN row_number() over ()
+                        ELSE cluster_id
+                    END as cluster_id,
+                    ST_Transform (ST_Envelope (ST_Collect (geom)), 3857) AS bbox
+                FROM
+                    (
+                        SELECT
+                            ST_ClusterDBSCAN (geom, eps := 30, minpoints := 2) over () AS cluster_id,
+                            geom
+                        FROM
+                            D
+                    ) subquery
+                GROUP BY
+                    cluster_id,
+                    CASE
+                        WHEN cluster_id IS NULL THEN geom
+                    END
+            ),
+            /* 
+            Project cluster BBox to vector tile coordinates
+            */
+            tile_coords AS (
+                SELECT
+                    cluster_id,
+                    epsg3857_to_vector_tile (
+                        ST_Xmin (clusters.bbox),
+                        ST_Ymax (clusters.bbox),
+                        ${zoomLevel}
+                    ) AS top_left,
+                    epsg3857_to_vector_tile (
+                        ST_Xmax (clusters.bbox),
+                        ST_Ymin (clusters.bbox),
+                        ${zoomLevel}
+                    ) AS bot_right
+                FROM
+                    clusters
+            ),
+            /*
+            Interpolate box vector tile coordinates
+            */
+            x_series AS (
+                SELECT
+                    cluster_id,
+                    generate_series((top_left).tile_x, (bot_right).tile_x) AS tile_x
+                FROM
+                    tile_coords
+            ),
+            y_series AS (
+                SELECT
+                    cluster_id,
+                    generate_series((top_left).tile_y, (bot_right).tile_y) AS tile_y
+                FROM
+                    tile_coords
+            )
+            /*
+            Retrieve cluster vector tiles
+            */
+        SELECT
+            xs.cluster_id,
+            xs.tile_x,
+            ys.tile_y
+        FROM
+            x_series AS xs
+            JOIN y_series AS ys ON xs.cluster_id = ys.cluster_id;
+        `
+      );
+      fastify.log.info("MVT Cluster Result:", mvtResult);
+      // Build MVTStrings from query Result
+      for (const row of mvtResult) {
+        const { cluster_id, tile_x, tile_y } = row;
+        mvtStrings.add(`${zoomLevel}/${tile_x}/${tile_y}`);
       }
       return mvtStrings;
     },
