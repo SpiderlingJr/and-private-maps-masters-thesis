@@ -19,6 +19,7 @@ import cacheEvictionPlugin, {
 import performanceMeterPlugin from "./plugins/performanceMeterPlugin";
 import { TransportMultiOptions } from "pino";
 
+import cors from "@fastify/cors";
 declare module "pino" {
   //eslint-disable-next-line @typescript-eslint/no-namespace
   namespace pino {
@@ -93,7 +94,7 @@ app.register(validatorPlugin);
 app.register(cacheEvictionPlugin, {
   strategy:
     (process.env.EVICTION_STRATEGY?.toUpperCase() as EvictionStrategy) ??
-    EvictionStrategy[EvictionStrategy.BOXCUT_BO],
+    EvictionStrategy[EvictionStrategy.CLUSTER_BOXCUT],
 });
 app.register(performanceMeterPlugin);
 
@@ -105,6 +106,10 @@ app.register(styleRoutes);
 app.register(cacheRoutes);
 app.register(helperRoutes);
 
+app.register(cors, {
+  origin: "http://localhost:5173",
+  methods: ["GET", "PUT", "POST"],
+});
 const handler: closeWithGrace.CloseWithGraceAsyncCallback = async ({ err }) => {
   if (err) {
     app.log.error(err);
