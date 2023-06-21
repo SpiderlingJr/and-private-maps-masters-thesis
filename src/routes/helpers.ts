@@ -55,10 +55,30 @@ export default async function (
     reply.code(200).send(newJob);
   });
 
-  app.get("/doink", async function (req, reply) {
-    await app.cache.set("doink", "poink");
+  app.get("/dropCache", async function (req, reply) {
+    await app.cache.clear();
     reply.send(200);
   });
+
+  app.get(
+    "/delta/:coll1/:coll2",
+    {
+      schema: {
+        params: Type.Object({
+          coll1: Type.String(),
+          coll2: Type.String(),
+        }),
+      },
+    },
+    async function (req, reply) {
+      const { coll1, coll2 } = req.params;
+
+      const newColl = await app.db.createCollection();
+      const delta = await app.db.calcCollectionDelta(coll1, coll2, newColl);
+
+      reply.send({ newColl });
+    }
+  );
 
   app.addHook("onClose", async () => {
     console.log("stopping helper routes");

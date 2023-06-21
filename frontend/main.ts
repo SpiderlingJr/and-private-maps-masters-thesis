@@ -155,8 +155,17 @@ context.textAlign = "center";
 context.font = "24px sans-serif";
 const lineHeight = 30;
 
-const coll1 = "eb8ace56-83a5-44e7-80d1-5ec9fefc8013";
-const coll2 = "6b62af50-aa44-48b8-9ca8-b0c3fb095ce9";
+const collection1DisplayButton = document.getElementById(
+  "collection1DisplayButton"
+)!;
+const collection2DisplayButton = document.getElementById(
+  "collection2DisplayButton"
+)!;
+
+let coll1: string | null = null;
+let coll2: string | null = null;
+let coll1Url = `/collections/eb8ace56-83a5-44e7-80d1-5ec9fefc8013/{z}/{x}/{y}.vector.pbf`;
+let coll2Url = `/collections/eb8ace56-83a5-44e7-80d1-5ec9fefc8013/{z}/{x}/{y}.vector.pbf`;
 
 const map = new Map({
   layers: [
@@ -167,7 +176,7 @@ const map = new Map({
       declutter: true,
       source: new VectorTileSource({
         format: new MVT(),
-        url: `/collections/${coll1}/{z}/{x}/{y}.vector.pbf`,
+        url: coll1Url,
       }),
       style: styleGreen(),
     }),
@@ -175,9 +184,17 @@ const map = new Map({
       declutter: true,
       source: new VectorTileSource({
         format: new MVT(),
-        url: `/collections/${coll2}/{z}/{x}/{y}.vector.pbf`,
+        url: coll2Url,
       }),
       style: styleBlue(),
+    }),
+    new VectorTileLayer({
+      declutter: true,
+      source: new VectorTileSource({
+        format: new MVT(),
+        url: "",
+      }),
+      style: styleRed(),
     }),
     new VectorLayer({
       source: deltaLayer,
@@ -235,8 +252,23 @@ const lonlatZoom = document.getElementById("lonlatZoom");
 const lon = document.getElementById("lon");
 const lat = document.getElementById("lat");
 
-document.getElementById("deltaButton")?.addEventListener("click", function () {
-  const layers = map.getLayers().getArray();
+document
+  .getElementById("deltaButton")
+  ?.addEventListener("click", async function () {
+    const response = await fetch(
+      `http://localhost:3000/delta/${coll1}/${coll2}`,
+      { method: "GET" }
+    );
+    const collId = await response.json();
+    console.log(collId);
+
+    const deltaUrl = `http://localhost:3000/collections/${collId.newColl}/{z}/{x}/{y}.vector.pbf`;
+    const layers = map.getLayers().getArray();
+    (layers[3] as VectorTileLayer).getSource()?.clear();
+    (layers[3] as VectorTileLayer).getSource()?.setUrl(deltaUrl);
+
+    await fetch("http://localhost:3000/dropCache");
+    /*const layers = map.getLayers().getArray();
 
   const layerSource1 = (layers[1] as VectorTileLayer).getSource();
   const layerSource2 = (layers[2] as VectorTileLayer).getSource();
@@ -251,11 +283,22 @@ document.getElementById("deltaButton")?.addEventListener("click", function () {
     map.getView().calculateExtent(map.getSize())
   )[0];
 
-  const ft1 = feature1 as Feature;
-  const ft2 = feature2 as Feature;
+  let ft1;
+  let ft2;
+
+  const geoJSONFormat = new GeoJSON();
+  const ft1GeoJSON = geoJSONFormat.writeFeatureObject(ft1!);
+  const ft2GeoJSON = geoJSONFormat.writeFeatureObject(ft2!);
+
+  const ft1g = ft1GeoJSON as unknown as Feature<Polygon | MultiPolygon, {}>;
+  const ft2g = ft2GeoJSON as unknown as Feature<Polygon | MultiPolygon, {}>;
+  // Check that the features indeed have Polygon or MultiPolygon geometries
+
+  const delta = turf.difference(ft1g, ft2g);
   console.log("Ft1:", ft1);
   console.log("Ft2:", ft2);
-});
+  */
+  });
 
 document
   .getElementById("lonlatJumpButton")
@@ -310,6 +353,38 @@ document
     }
   });
 
+collection1DisplayButton.addEventListener("click", async function () {
+  console.log("coll1 changed");
+  const collection1Input = document.getElementById("collection1Input");
+  coll1 = (<HTMLInputElement>collection1Input).value;
+  coll1Url = `/collections/${coll1}/{z}/{x}/{y}.vector.pbf`;
+  console.log("now coll1Url is", coll1Url);
+  const layers = map.getLayers().getArray();
+
+  (layers[1] as VectorTileLayer).getSource()?.clear();
+  (layers[1] as VectorTileLayer).getSource()?.setUrl(coll1Url);
+  console.log(
+    "layer source",
+    (layers[1] as VectorTileLayer).getSource()?.getUrls()
+  );
+  await fetch(`http://localhost:3000/dropCache`);
+});
+
+collection2DisplayButton.addEventListener("click", async function () {
+  console.log("coll2 changed");
+  const collection2Input = document.getElementById("collection2Input");
+  coll2 = (<HTMLInputElement>collection2Input).value;
+  coll2Url = `/collections/${coll2}/{z}/{x}/{y}.vector.pbf`;
+  console.log("now coll2Url is", coll2Url);
+  const layers = map.getLayers().getArray();
+  (layers[2] as VectorTileLayer).getSource()?.clear();
+  (layers[2] as VectorTileLayer).getSource()?.setUrl(coll2Url);
+  console.log(
+    "layer source",
+    (layers[2] as VectorTileLayer).getSource()?.getUrls()
+  );
+  await fetch(`http://localhost:3000/dropCache`);
+});
 document
   .getElementById("prefabSelectButton")
   ?.addEventListener("click", function () {
