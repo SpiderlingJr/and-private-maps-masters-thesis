@@ -267,6 +267,11 @@ interface PostgresDB {
     collectionId: string,
     maxZoom: number
   ): Promise<Set<string>>;
+  calcCollectionDelta(
+    coll1: string,
+    coll2: string,
+    newColl: string
+  ): Promise<any>;
 }
 /**
  *  Plugin handling database communication
@@ -850,6 +855,47 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         mvtStrings.add(`${zoomLevel}/${tile_x}/${tile_y}`);
       }
       return mvtStrings;
+    },
+    async calcCollectionDelta(coll1: string, coll2: string, newColl: string) {
+      const queryRunner = conn.createQueryRunner();
+      const delta = await queryRunner.query(
+        `
+        WITH
+        E AS (
+          SELECT ST_Union(geom) as geom
+          FROM features
+          WHERE ft_collection = '${coll1}'
+        ),
+        N AS (
+          SELECT ST_Union(geom) as geom
+          FROM features
+          WHERE ft_collection = '${coll2}'
+        ),
+        U AS (
+          SELECT ST_Union(E.geom, N.geom) as geom
+          FROM E, N
+        ),
+        I AS (
+          SELECT ST_Intersection(E.geom, N.geom) as geom
+          FROM E, N
+        ),
+        D AS (
+          SELECT ST_Difference(U.geom, I.geom) as geom
+          FROM U, I
+        )
+        INSERT INTO features (geom, ft_collection, properties)
+        SELECT 
+            D.geom, 
+            '${newColl}', 
+            jsonb_build_object(
+              'is', 'delta',
+              'coll1', '${coll1}', 
+              'coll2', '${coll2}'
+              )
+        FROM D;
+      `
+      );
+      return delta;
     },
   } satisfies PostgresDB);
 
