@@ -31,7 +31,7 @@ interface Evictor {
    * Method to evict tiles from cache that are stale due to a change in the database
    * @param deltaPolys A set of polygons representing the changes in the database
    */
-  evict(collectionId: string): Promise<void>;
+  evict(collectionId: string): Promise<Set<string>>;
 }
 /**
  *
@@ -165,7 +165,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
 
           await evictEntries(parentMvtStrings);
           await evictEntries(mvtStrings);
-          return;
+          return mvtStrings;
         },
       } satisfies Evictor);
       break;
@@ -208,7 +208,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
 
           await evictEntries(parentMvtStrings);
           await evictEntries(mvtStrings);
-          return;
+          return mvtStrings;
         },
       } satisfies Evictor);
       break;
@@ -243,11 +243,43 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
 
           await evictEntries(parentMvtStrings);
           await evictEntries(mvtStrings);
-          return;
+          return mvtStrings;
         },
       } satisfies Evictor);
       break;
 
+    case EvictionStrategy.CLUSTER_BOXCUT:
+      fastify.log.info(
+        `Using Eviction Strategy: Cluster Boxcut with Max Zoom ${maxZoom}`
+      );
+      fastify.decorate("evictor", {
+        async evict(collectionId: string) {
+          const getMvtStringsTimer = fastify.performanceMeter.startTimer(
+            `cluster-boxcut-evict-${collectionId}`
+          );
+          const mvtStrings = await fastify.db.getPatchedMVTStringsClusterBoxcut(
+            collectionId,
+            maxZoom
+          );
+          getMvtStringsTimer.stop(true);
+
+          const findMvtParentsTimer = fastify.performanceMeter.startTimer(
+            `exact-evict-parents-${collectionId}`
+          );
+          const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
+          findMvtParentsTimer.stop(true);
+
+          fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
+          logMvts(Array.from(mvtStrings));
+          fastify.log.metric(`Evicting ${parentMvtStrings.size} parent tiles`);
+          logMvts(Array.from(parentMvtStrings));
+
+          await evictEntries(parentMvtStrings);
+          await evictEntries(mvtStrings);
+          return mvtStrings;
+        },
+      } satisfies Evictor);
+      break;
     default:
       throw new Error("Invalid eviction strategy");
   }

@@ -240,6 +240,29 @@ interface PostgresDB {
     collId: string,
     zoomLevel: number
   ): Promise<Set<string>>;
+  /** Finds vector tile set to evict after a patch. This method tries to find
+   * clusters in the change set and evicts the bounding boxes of found clusters.
+   *
+   * Strategy:
+   * 1. Get features from patch_features table (N)
+   * 2. Get features from features table (E)
+   * 3. Build the union of N and E =: U
+   * 4. Build the intersection of N and E =: I
+   * 5. Build the difference of U and I =: D := change set
+   * 6. Run a DBSCAN clustering algorithm on D
+   * 7. For each cluster, build the bounding box
+   * 8. Find the vector tiles that the bounding boxes reside in by mapping the
+   * upper left and lower right corner of the bounding box to their corresponding
+   * vector tiles, then use generate_series to interpolate all tiles in between.
+   * 9. Return all intersecting MVTs in form of z/x/y
+   *
+   * Outlier clusters are treated as their own seperate clusters.
+   *
+   * @param collId: uuid of updated collection, must exist in features and
+   * patch_features table
+   * @param zoomLevel: zoom level of mvt tiles to be evicted
+   * @returns set of mvt strings in form of z/x/y
+   */
   getPatchedMVTStringsClusterBoxcut(
     collectionId: string,
     maxZoom: number
