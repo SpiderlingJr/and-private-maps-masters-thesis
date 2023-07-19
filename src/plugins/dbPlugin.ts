@@ -211,8 +211,17 @@ interface PostgresDB {
    * @param zoomLevel: zoom level of mvt tiles to be evicted
    * @returns set of mvt strings in form of z/x/y
    */
-
   getPatchedMVTStringsBoxcut(
+    collId: string,
+    zoomLevel: number
+  ): Promise<Set<string>>;
+  /** Same as Boxcut, but uses generate_series to generate tile coordinates in
+   * union box, instead of intersecting with all tiles in mvtTable.
+   *
+   * @param collId
+   * @param zoomLevel
+   */
+  getPatchedMVTStringsBoxcutIter(
     collId: string,
     zoomLevel: number
   ): Promise<Set<string>>;
@@ -233,12 +242,12 @@ interface PostgresDB {
    *
    * @param collId: uuid of updated collection, must exist in features and
    * patch_features table
-   * @param zoomLevel: zoom level of mvt tiles to be evicted
+   * @param maxZoom: zoom level of mvt tiles to be evicted
    * @returns set of mvt strings in form of z/x/y
    */
   getPatchedMVTStringsExact(
     collId: string,
-    zoomLevel: number
+    maxZoom: number
   ): Promise<Set<string>>;
   /** Finds vector tile set to evict after a patch. This method tries to find
    * clusters in the change set and evicts the bounding boxes of found clusters.
@@ -267,11 +276,44 @@ interface PostgresDB {
     collectionId: string,
     maxZoom: number
   ): Promise<Set<string>>;
+  /** Same as getPatchedMVTStringsClusterBoxcut, but uses lateral joins in the
+   * dump step to speed up the process.
+   *
+   * @param collectionId
+   * @param maxZoom
+   * @returns set of mvt strings in form of z/x/y
+   */
+  getPatchedMVTStringsClusterBoxcutLateral(
+    collectionId: string,
+    maxZoom: number
+  ): Promise<Set<string>>;
+  /** Cluster Strategy that applies exact logic on clusters.
+   *
+   * @param collectionId
+   * @param maxZoom
+   * @returns set of mvt strings in form of z/x/y
+   */
+  getPatchedMVTStringsClusterExact(
+    collectionId: string,
+    maxZoom: number
+  ): Promise<Set<string>>;
   calcCollectionDelta(
     coll1: string,
     coll2: string,
     newColl: string
   ): Promise<any>;
+  /** Loads a set of tiles into cache by calling getMVT for each tile.
+   *
+   * @param collectionId uuid of collection to which tiles belong
+   * @param droppedTiles
+   *
+   * @returns number of tiles loaded into cache
+   */
+  fillCache(
+    collectionId: string,
+    tiles: Set<string>,
+    maxReload?: number
+  ): Promise<number>;
 }
 /**
  *  Plugin handling database communication
@@ -593,9 +635,32 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           z: z,
         });
       }
-      fastify.log.debug(`Received: ${z}/${x}/${y}`);
+      fastify.log.trace(`Received: ${z}/${x}/${y}`);
 
       return mvtResponse;
+    },
+    async fillCache(collId: string, tiles: Set<string>, maxReload = 1000) {
+      const cache = fastify.cache;
+      let i = 0;
+      const numTiles = tiles.size;
+      //const tenPercent = Math.floor(numTiles / 10);
+      for (const tile of tiles) {
+        i++;
+        /*
+        if (i % tenPercent === 0) {
+          fastify.log.info(
+            `Filling cache progress: ${Math.floor((i / numTiles) * 100)}%`
+          );
+        }*/
+        const [z, x, y] = tile.split("/").map((x) => parseInt(x));
+        const mvt = await this.getMVT(collId, z, x, y);
+        await cache.set(tile, mvt[0].st_asmvt);
+        if (i >= maxReload) {
+          fastify.log.info(`Reached reload limit of ${maxReload} tiles.`);
+          break;
+        }
+      }
+      return i;
     },
     async patchCollection(collectionId: string) {
       fastify.log.debug("Patching collection", collectionId);
@@ -691,12 +756,12 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       }
       return mvtStrings;
     },
-    async getPatchedMVTStringsExact(collId: string, zoomLevel: number) {
+    async getPatchedMVTStringsBoxcutIter(collId: string, zoomLevel: number) {
       const mvtStrings = new Set<string>();
       const queryRunner = conn.createQueryRunner();
-      const deltaMvts = await queryRunner.query(
+      const mvtResult = await queryRunner.query(
         `
-          WITH
+        WITH
           E AS (
             SELECT ST_Union(geom) as geom
             FROM features
@@ -708,21 +773,127 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
             WHERE ft_collection = '${collId}'
           ),
           U AS (
-            SELECT ST_Union(E.geom, N.geom) as geom
-            FROM E, N
+            SELECT
+                ST_Envelope (ST_Transform (ST_Union (E.geom, N.geom), 3857)) as unibox
+            FROM
+                E,
+                N
+          ),
+          BBOX AS (
+              SELECT
+                  epsg3857_to_vector_tile (
+                      ST_Xmin (U.unibox),
+                      ST_Ymax (U.unibox),
+                      ${zoomLevel}
+                  ) as top_left,
+                  epsg3857_to_vector_tile (
+                      ST_Xmax (U.unibox),
+                      ST_Ymin (U.unibox),
+                      ${zoomLevel}
+                  ) as bot_right
+              FROM
+                  U
+          ),
+          x_series AS (
+              SELECT
+                  generate_series((top_left).tile_x, (bot_right).tile_x) AS tile_x
+              FROM
+                  BBOX
+          ),
+          y_series AS (
+              SELECT
+                  generate_series((top_left).tile_y, (bot_right).tile_y) AS tile_y
+              FROM
+                  BBOX
+          )
+          SELECT
+              xs.tile_x as x,
+              ys.tile_y as y
+          FROM
+              x_series AS xs
+              JOIN y_series AS ys ON TRUE
+      `
+      );
+      // Build MVTStrings from query Result
+      for (const row of mvtResult) {
+        const { x, y } = row;
+        mvtStrings.add(`${zoomLevel}/${x}/${y}`);
+      }
+      return mvtStrings;
+    },
+    async getPatchedMVTStringsExact(collId: string, zoomLevel: number) {
+      const mvtStrings = new Set<string>();
+      const queryRunner = conn.createQueryRunner();
+      const deltaMvts = await queryRunner.query(
+        `
+        WITH
+          E AS (
+            SELECT 
+              ST_Union(geom) as geom
+            FROM 
+              features
+            WHERE 
+              ft_collection = '${collId}'
+          ),
+          N AS (
+            SELECT 
+              ST_Union(geom) as geom
+            FROM 
+              patch_features
+            WHERE 
+              ft_collection = '${collId}'
+          ),
+          U AS (
+            SELECT 
+              ST_Union(E.geom, N.geom) AS geom
+            FROM 
+              E, 
+              N
           ),
           I AS (
-            SELECT ST_Intersection(E.geom, N.geom) as geom
-            FROM E, N
+            SELECT 
+              ST_Intersection(E.geom, N.geom) AS geom
+            FROM 
+              E, 
+              N
           ),
           D AS (
-            SELECT ST_Difference(U.geom, I.geom) as geom
+            SELECT 
+              ST_Difference(U.geom, I.geom) AS geom,
+              ST_Transform(ST_Envelope(ST_Difference(U.geom, I.geom)),3857) as bbox
             FROM U, I
+          ),
+          BBOX AS (
+            SELECT
+            epsg3857_to_vector_tile (
+              ST_Xmin(D.bbox),
+              ST_Ymax(D.bbox),
+              ${zoomLevel}
+              ) as top_left,
+            epsg3857_to_vector_tile (
+              ST_Xmax(D.bbox),
+              ST_Ymin(D.bbox),
+              ${zoomLevel}
+              ) as bot_right
+            FROM D
           )
-          SELECT x, y
-          FROM D JOIN mvt${zoomLevel}
-          ON ST_Intersects(ST_SetSrid(D.geom, 4326), mvt${zoomLevel}.geom)
-          ORDER BY x asc, y asc
+          SELECT 
+            x, y
+          FROM 
+            D 
+          JOIN 
+            BBOX 
+            ON true
+          JOIN 
+            mvt${zoomLevel}
+          ON 
+            mvt${zoomLevel}.x BETWEEN (top_left).tile_x AND (bot_right).tile_x 
+          AND 
+            mvt${zoomLevel}.y BETWEEN (top_left).tile_y AND (bot_right).tile_y
+          AND 
+            ST_Intersects(ST_SetSrid(D.geom, 4326), mvt${zoomLevel}.geom)
+          ORDER BY 
+            x ASC, y ASC	
       `
       );
       // Build MVTStrings from query Result
@@ -733,6 +904,11 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       return mvtStrings;
     },
     async getPatchedMVTStringsClusterBoxcut(collId: string, zoomLevel: number) {
+      const epsZ = 128 / Math.pow(2, zoomLevel);
+      fastify.log.metric({
+        name: "epsZ",
+        value: epsZ,
+      });
       const mvtStrings = new Set<string>();
       const queryRunner = conn.createQueryRunner();
       const mvtResult: ClusteredTiles[] = await queryRunner.query(
@@ -789,7 +965,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
                 FROM
                     (
                         SELECT
-                            ST_ClusterDBSCAN (geom, eps := 30, minpoints := 2) over () AS cluster_id,
+                            ST_ClusterDBSCAN (geom, eps := ${epsZ}, minpoints := 2) over () AS cluster_id,
                             geom
                         FROM
                             D
@@ -852,6 +1028,260 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       // Build MVTStrings from query Result
       for (const row of mvtResult) {
         const { cluster_id, tile_x, tile_y } = row;
+        mvtStrings.add(`${zoomLevel}/${tile_x}/${tile_y}`);
+      }
+      return mvtStrings;
+    },
+    async getPatchedMVTStringsClusterBoxcutLateral(
+      collId: string,
+      zoomLevel: number
+    ) {
+      const epsZ = 128 / Math.pow(2, zoomLevel);
+      fastify.log.metric({
+        name: "epsZ",
+        value: epsZ,
+      });
+      const mvtStrings = new Set<string>();
+      const queryRunner = conn.createQueryRunner();
+      const mvtResult: ClusteredTiles[] = await queryRunner.query(
+        `
+        WITH
+            E AS (
+                SELECT
+                    ST_Union (geom) as geom
+                FROM
+                    features
+                WHERE
+                    ft_collection = '${collId}'
+            ),
+            N AS (
+                SELECT
+                    ST_Union (geom) as geom
+                FROM
+                    patch_features
+                WHERE
+                    ft_collection = '${collId}'
+            ),
+            U AS (
+                SELECT
+                    ST_Union (E.geom, N.geom) as geom
+                FROM
+                    E,
+                    N
+            ),
+            I AS (
+                SELECT
+                    ST_Intersection (E.geom, N.geom) as geom
+                FROM
+                    E,
+                    N
+            ),
+            D AS (
+                SELECT
+                    ST_Difference (U.geom, I.geom) as geom
+                FROM
+                    U,
+                    I
+            ),
+            /*
+            Build clusters from change set
+            */
+            clusters AS (
+              SELECT
+                CASE
+                  WHEN cluster_id IS NULL THEN row_number() over ()
+                  ELSE cluster_id
+                END as cluster_id,
+                ST_Transform (ST_Envelope (ST_Collect (geom)), 3857) AS bbox
+              FROM
+                (
+                  SELECT
+                    dump.geom, 
+                    ST_ClusterDBSCAN (dump.geom, eps := ${epsZ}, minpoints := 2) over () AS cluster_id
+                  FROM
+                    D, 
+                    LATERAL ST_Dump(D.geom) as dump
+                ) subquery
+              GROUP BY
+                cluster_id,
+                CASE
+                  WHEN cluster_id IS NULL THEN geom
+                END
+            ),
+            /* 
+            Project cluster BBox to vector tile coordinates
+            */
+            tile_coords AS (
+                SELECT
+                    cluster_id,
+                    epsg3857_to_vector_tile (
+                        ST_Xmin (clusters.bbox),
+                        ST_Ymax (clusters.bbox),
+                        ${zoomLevel}
+                    ) AS top_left,
+                    epsg3857_to_vector_tile (
+                        ST_Xmax (clusters.bbox),
+                        ST_Ymin (clusters.bbox),
+                        ${zoomLevel}
+                    ) AS bot_right
+                FROM
+                    clusters
+            ),
+            /*
+            Interpolate box vector tile coordinates
+            */
+            x_series AS (
+                SELECT
+                    cluster_id,
+                    generate_series((top_left).tile_x, (bot_right).tile_x) AS tile_x
+                FROM
+                    tile_coords
+            ),
+            y_series AS (
+                SELECT
+                    cluster_id,
+                    generate_series((top_left).tile_y, (bot_right).tile_y) AS tile_y
+                FROM
+                    tile_coords
+            )
+            /*
+            Retrieve cluster vector tiles
+            */
+        SELECT
+            xs.cluster_id,
+            xs.tile_x,
+            ys.tile_y
+        FROM
+            x_series AS xs
+            JOIN y_series AS ys ON xs.cluster_id = ys.cluster_id;
+        `
+      );
+      fastify.log.info("MVT Cluster Result:", mvtResult);
+      // Build MVTStrings from query Result
+      for (const row of mvtResult) {
+        const { cluster_id, tile_x, tile_y } = row;
+        mvtStrings.add(`${zoomLevel}/${tile_x}/${tile_y}`);
+      }
+      return mvtStrings;
+    },
+    async getPatchedMVTStringsClusterExact(collId: string, zoomLevel: number) {
+      const epsZ = 128 / Math.pow(2, zoomLevel);
+      fastify.log.metric({
+        name: "epsZ",
+        value: epsZ,
+      });
+      const mvtStrings = new Set<string>();
+      const queryRunner = conn.createQueryRunner();
+      const mvtResult: ClusteredTiles[] = await queryRunner.query(
+        `
+        WITH
+          E AS (
+              SELECT
+                  ST_Union (geom) as geom
+              FROM
+                  features
+              WHERE
+                  ft_collection = '${collId}'
+          ),
+          N AS (
+              SELECT
+                  ST_Union (geom) as geom
+              FROM
+                  patch_features
+              WHERE 
+                  ft_collection = '${collId}'
+          ),
+          U AS (
+              SELECT
+                  ST_Union (E.geom, N.geom) as geom
+              FROM
+                  E,
+                  N
+          ),
+          I AS (
+              SELECT
+                  ST_Intersection (E.geom, N.geom) as geom
+              FROM
+                  E,
+                  N
+          ),
+          D AS (
+              SELECT
+                  (ST_Dump (ST_Difference (U.geom, I.geom))).geom
+              FROM
+                  U,
+                  I
+          ),
+          /*
+          Build clusters from change set
+          */
+          CLUSTERS AS (
+              SELECT
+                  CASE
+                      WHEN cluster_id IS NULL THEN row_number() over ()
+                      ELSE cluster_id
+                  END as cluster_id,
+                  ST_Transform (ST_Collect (geom), 3857) AS geom, -- The clustered geometry
+                  ST_Transform (ST_Envelope (ST_Collect (geom)), 3857) AS bbox -- Bounding box of the cluster
+              FROM
+                  (
+                      SELECT
+                          ST_ClusterDBSCAN (geom, eps := ${epsZ}, minpoints := 2) over () AS cluster_id,
+                          geom
+                      FROM
+                          D
+                  ) subquery
+              GROUP BY
+                  cluster_id,
+                  CASE
+                      WHEN cluster_id IS NULL THEN geom
+                  END
+          ),
+          /* 
+          Project cluster BBox to vector tile coordinates
+          */
+          CLUSTER_BBOX_BOUNDS AS (
+              SELECT
+                  cluster_id
+                  ,geom
+                  ,CLUSTERS.bbox as bbox
+                  ,epsg3857_to_vector_tile (
+                      ST_Xmin (CLUSTERS.bbox),
+                      ST_Ymax (CLUSTERS.bbox),
+                      ${zoomLevel}
+                  ) AS top_left
+                  ,epsg3857_to_vector_tile (
+                      ST_Xmax (CLUSTERS.bbox),
+                      ST_Ymin (CLUSTERS.bbox),
+                      ${zoomLevel}
+                  ) AS bot_right
+              FROM
+                  CLUSTERS
+          )
+        SELECT
+          --CLUSTER_BBOX_BOUNDS.cluster_id,
+          distinct
+          mvt_prefab.x AS tile_x,
+          mvt_prefab.y AS tile_y
+        FROM
+          CLUSTER_BBOX_BOUNDS
+        JOIN
+          mvt${zoomLevel} as mvt_prefab
+        ON 
+          mvt_prefab.x BETWEEN (CLUSTER_BBOX_BOUNDS.top_left).tile_x AND (CLUSTER_BBOX_BOUNDS.bot_right).tile_x
+        AND 
+          mvt_prefab.y BETWEEN (CLUSTER_BBOX_BOUNDS.top_left).tile_y AND (CLUSTER_BBOX_BOUNDS.bot_right).tile_y
+        AND 
+          ST_Intersects(ST_Transform(ST_SetSRID(CLUSTER_BBOX_BOUNDS.geom, 3857), 4326), mvt_prefab.geom)
+        ORDER BY
+          tile_x ASC,
+          tile_y ASC;
+        `
+      );
+      //fastify.log.info(`MVT Cluster Result: ${JSON.stringify(mvtResult)}`);
+      // Build MVTStrings from query Result
+      for (const row of mvtResult) {
+        const { tile_x, tile_y } = row;
         mvtStrings.add(`${zoomLevel}/${tile_x}/${tile_y}`);
       }
       return mvtStrings;

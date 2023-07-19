@@ -4,6 +4,7 @@
     {
       "type": "Feature",
       "properties": {
+        "id": "cs1",
         "in": "clusterStress",
         "is": "northAmerica2",
         "cluster": "na1"
@@ -19,12 +20,12 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 0
+      }
     },
     {
       "type": "Feature",
       "properties": {
+        "id": "cs2",
         "in": "clusterStress",
         "is": "northAmerica1",
         "cluster": "na1"
@@ -43,12 +44,12 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 1
+      }
     },
     {
       "type": "Feature",
       "properties": {
+        "id": "cs3",
         "in": "clusterStress",
         "is": "southAmerica",
         "cluster": "isolated1"
@@ -64,15 +65,11 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 2
+      }
     },
     {
       "type": "Feature",
-      "properties": {
-        "in": "clusterStress",
-        "cluster": "eu1"
-      },
+      "properties": { "id": "cs4", "in": "clusterStress", "cluster": "eu1" },
       "geometry": {
         "coordinates": [
           [
@@ -84,12 +81,12 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 3
+      }
     },
     {
       "type": "Feature",
       "properties": {
+        "id": "cs5",
         "in": "clusterStress",
         "is": "hannover",
         "cluster": "eu2"
@@ -97,12 +94,12 @@
       "geometry": {
         "coordinates": [9.786438138708434, 52.40156843667452],
         "type": "Point"
-      },
-      "id": 4
+      }
     },
     {
       "type": "Feature",
       "properties": {
+        "id": "cs6",
         "in": "clusterStress",
         "is": "bremen",
         "cluster": "eu2"
@@ -110,12 +107,12 @@
       "geometry": {
         "coordinates": [8.811757921179833, 53.0759740752554],
         "type": "Point"
-      },
-      "id": 5
+      }
     },
     {
       "type": "Feature",
       "properties": {
+        "id": "cs7",
         "in": "clusterStress",
         "is": "hamburg",
         "cluster": "eu2"
@@ -123,15 +120,11 @@
       "geometry": {
         "coordinates": [9.995298185322127, 53.57494915882418],
         "type": "Point"
-      },
-      "id": 6
+      }
     },
     {
       "type": "Feature",
-      "properties": {
-        "in": "clusterStress",
-        "cluster": "eu3"
-      },
+      "properties": { "id": "cs8", "in": "clusterStress", "cluster": "eu3" },
       "geometry": {
         "coordinates": [
           [
@@ -143,27 +136,19 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 7
+      }
     },
     {
       "type": "Feature",
-      "properties": {
-        "in": "clusterStress",
-        "cluster": "eu3"
-      },
+      "properties": { "id": "cs9", "in": "clusterStress", "cluster": "eu3" },
       "geometry": {
         "coordinates": [9.612388099863892, 49.14533412575591],
         "type": "Point"
-      },
-      "id": 8
+      }
     },
     {
       "type": "Feature",
-      "properties": {
-        "in": "clusterStress",
-        "cluster": "eu3"
-      },
+      "properties": { "id": "cs10", "in": "clusterStress", "cluster": "eu3" },
       "geometry": {
         "coordinates": [
           [
@@ -175,15 +160,11 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 9
+      }
     },
     {
       "type": "Feature",
-      "properties": {
-        "in": "clusterStress",
-        "cluster": "eu3"
-      },
+      "properties": { "id": "cs11", "in": "clusterStress", "cluster": "eu3" },
       "geometry": {
         "coordinates": [
           [
@@ -195,15 +176,11 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 10
+      }
     },
     {
       "type": "Feature",
-      "properties": {
-        "in": "clusterStress",
-        "cluster": "eu3"
-      },
+      "properties": { "id": "cs12", "in": "clusterStress", "cluster": "eu3" },
       "geometry": {
         "coordinates": [
           [
@@ -215,15 +192,11 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 11
+      }
     },
     {
       "type": "Feature",
-      "properties": {
-        "in": "clusterStress",
-        "cluster": "eu3"
-      },
+      "properties": { "id": "cs13", "in": "clusterStress", "cluster": "eu3" },
       "geometry": {
         "coordinates": [
           [
@@ -235,15 +208,11 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 12
+      }
     },
     {
       "type": "Feature",
-      "properties": {
-        "in": "clusterStress",
-        "cluster": "eu3"
-      },
+      "properties": { "id": "cs14", "in": "clusterStress", "cluster": "eu3" },
       "geometry": {
         "coordinates": [
           [
@@ -264,8 +233,7 @@
           ]
         ],
         "type": "Polygon"
-      },
-      "id": 13
+      }
     }
   ]
 }

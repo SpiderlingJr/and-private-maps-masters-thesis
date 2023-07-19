@@ -52,7 +52,7 @@ const performanceMeterPlugin: FastifyPluginAsync = async (fastify) => {
       if (t) {
         t.stop(success);
       } else {
-        fastify.log.warn(`timer ${name} not found`);
+        fastify.log.metric(`timer ${name} not found`);
       }
     },
     runTask: async (name: string, task: () => Promise<void>) => {

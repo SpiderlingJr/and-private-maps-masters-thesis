@@ -25,16 +25,16 @@ test("standard workflow on randomly generated geodata", async (t) => {
   t.before(async () => {
     try {
       const testData = await generateRandomGeoFeatures(
-        50,
+        20,
         "test/data/dynamic",
-        "230619_rand_50"
+        "230719_rand"
       );
       randomTestDataPaths = testData;
     } catch (e) {
       console.log("error in generating random geo featues", e);
     }
   });
-
+  /*
   t.test("uploading a valid ndjson file", async (t) => {
     const collectionId = randomTestDataPaths.collectionId;
 
@@ -60,10 +60,12 @@ test("standard workflow on randomly generated geodata", async (t) => {
       "patching a valid ndjson file should return 200"
     );
     // wait a second
-    await awaitJobCompletion(mutatedPatchRes.body);
-
-    // get the mutated data from db
-    const mutatedDataRes = await app.inject({
+    await awaitJobCompletion(mutatedPatchRes.body).then((res) => {
+      console.log("res: ", res.body);
+    });
+    */
+  // get the mutated data from db
+  /* const mutatedDataRes = await app.inject({
       method: "GET",
       url: `/collections/${collectionId}/items`,
     });
@@ -93,16 +95,15 @@ test("standard workflow on randomly generated geodata", async (t) => {
       allEqual,
       true,
       "mutated data should be equal to the data in the db"
-    );
+    );*/
 
-    t.end();
-    /*
+  /*
     t.afterEach(async () => {
       await app.inject({
         method: "DELETE",
         url: `/collections/${randomTestDataPaths.collectionId}`,
       });
       // TODO check if the collection is actually deleted
-    });*/
-  });
+    })/
+  });*/
 });

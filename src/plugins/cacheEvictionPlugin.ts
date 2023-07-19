@@ -9,7 +9,7 @@ import {
   parsePolyPoints,
   rasterize,
 } from "./eviction/evictionUtil";
-const MAX_TRACE = 20;
+const MAX_TRACE = 3;
 const DEFAULT_MAX_ZOOM = 9;
 declare module "fastify" {
   interface FastifyInstance {
@@ -19,12 +19,15 @@ declare module "fastify" {
 export enum EvictionStrategy {
   BOXCUT_BO = "BOXCUT_BO",
   BOXCUT_BOTTOM_UP = "BOXCUT_BOTTOM_UP",
+  BOXCUT_ITER = "BOXCUT_ITER",
   BOXCUT_TD = "BOXCUT_TD",
   BOXCUT_TOP_DOWN = "BOXCUT_TOP_DOWN",
   RASTER_BO = "RASTER_BO",
   RASTER_BOTTOM_UP = "RASTER_BOTTOM_UP",
   EXACT = "EXACT",
+  CLUSTER_EXACT = "CLUSTER_EXACT",
   CLUSTER_BOXCUT = "CLUSTER_BOXCUT",
+  CLUSTER_BOXCUT_LATERAL = "CLUSTER_BOXCUT_LATERAL",
 }
 interface Evictor {
   /**
@@ -135,9 +138,9 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           const rasterTimer = fastify.performanceMeter.startTimer(
             `raster-bo-evict-rasterize-${collectionId}`
           );
-          fastify.log.debug(`Delta Polys: ${deltaPolys.toString()}`);
+          //fastify.log.debug(`Delta Polys: ${deltaPolys.toString()}`);
           const points = parsePolyPoints(deltaPolys);
-          fastify.log.debug(`Delta Poly Points: ${points.toString()}`);
+          fastify.log.debug(`Delta Poly Points: ${JSON.stringify(deltaPolys)}`);
 
           const mvts = rasterize(points, maxZoom);
           rasterTimer.stop(true);
@@ -159,9 +162,13 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           findMvtParentsTimer.stop(true);
 
           fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
-          logMvts(Array.from(mvtStrings));
+          if (fastify.log.level === "trace") {
+            logMvts(Array.from(mvtStrings));
+          }
           fastify.log.debug(`Evicting ${parentMvtStrings.size} parent tiles`);
-          logMvts(Array.from(parentMvtStrings));
+          /*if (fastify.log.level === "trace") {
+            logMvts(Array.from(parentMvtStrings));
+          }*/
 
           await evictEntries(parentMvtStrings);
           await evictEntries(mvtStrings);
@@ -187,7 +194,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
          */
         async evict(collectionId: string) {
           const getMvtStringsTimer = fastify.performanceMeter.startTimer(
-            `boxcut-bo-evict-${collectionId}`
+            `BoxcutBO-evict-${collectionId}`
           );
           const mvtStrings = await fastify.db.getPatchedMVTStringsBoxcut(
             collectionId,
@@ -196,12 +203,56 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           getMvtStringsTimer.stop(true);
 
           const findMvtParentsTimer = fastify.performanceMeter.startTimer(
-            `boxcut-bo-evict-parents-${collectionId}`
+            `BoxcutBo-evictParents-${collectionId}`
           );
           const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
           findMvtParentsTimer.stop(true);
 
           fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
+
+          logMvts(Array.from(mvtStrings));
+          fastify.log.metric(`Evicting ${parentMvtStrings.size} parent tiles`);
+          logMvts(Array.from(parentMvtStrings));
+
+          await evictEntries(parentMvtStrings);
+          await evictEntries(mvtStrings);
+          return mvtStrings;
+        },
+      } satisfies Evictor);
+      break;
+    case EvictionStrategy.BOXCUT_ITER:
+      fastify.log.info(
+        `Using Eviciton Strategy: Boxcut ITER with Max Zoom ${maxZoom}`
+      );
+      fastify.decorate("evictor", {
+        /** Compares the entries in the tables features and patch_features of a given
+         * collection and finds corresponding MVTs that need to be invalidated, using
+         * the following strategy:
+         * 1. Get features from patch_features table (N)
+         * 2. Get features from features table (E)
+         * 3. Build the bounding box of N and E
+         * 4. Build the union of N and E =: U
+         * 5. Run over all MVTs in passed mvtTable and check if they intersect with U
+         * 6. Return all intersecting MVTs in form of z/x/y
+         */
+        async evict(collectionId: string) {
+          const getMvtStringsTimer = fastify.performanceMeter.startTimer(
+            `BoxcutITER-evict-${collectionId}`
+          );
+          const mvtStrings = await fastify.db.getPatchedMVTStringsBoxcutIter(
+            collectionId,
+            maxZoom
+          );
+          getMvtStringsTimer.stop(true);
+
+          const findMvtParentsTimer = fastify.performanceMeter.startTimer(
+            `BoxcutITER-evictParents-${collectionId}`
+          );
+          const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
+          findMvtParentsTimer.stop(true);
+
+          fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
+
           logMvts(Array.from(mvtStrings));
           fastify.log.metric(`Evicting ${parentMvtStrings.size} parent tiles`);
           logMvts(Array.from(parentMvtStrings));
@@ -222,7 +273,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
       fastify.decorate("evictor", {
         async evict(collectionId: string) {
           const getMvtStringsTimer = fastify.performanceMeter.startTimer(
-            `exact-evict-${collectionId}`
+            `Exact-evict-${collectionId}`
           );
           const mvtStrings = await fastify.db.getPatchedMVTStringsExact(
             collectionId,
@@ -231,7 +282,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           getMvtStringsTimer.stop(true);
 
           const findMvtParentsTimer = fastify.performanceMeter.startTimer(
-            `exact-evict-parents-${collectionId}`
+            `Exact-evict-parents-${collectionId}`
           );
           const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
           findMvtParentsTimer.stop(true);
@@ -247,7 +298,38 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
         },
       } satisfies Evictor);
       break;
+    case EvictionStrategy.CLUSTER_EXACT:
+      fastify.log.info(
+        `Using Eviction Strategy: Cluster EXACT with Max Zoom ${maxZoom}`
+      );
+      fastify.decorate("evictor", {
+        async evict(collectionId: string) {
+          const getMvtStringsTimer = fastify.performanceMeter.startTimer(
+            `ClusterEXACT-evict-${collectionId}`
+          );
+          const mvtStrings = await fastify.db.getPatchedMVTStringsClusterExact(
+            collectionId,
+            maxZoom
+          );
+          getMvtStringsTimer.stop(true);
 
+          const findMvtParentsTimer = fastify.performanceMeter.startTimer(
+            `ClusterEXACT-evict-parents-${collectionId}`
+          );
+          const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
+          findMvtParentsTimer.stop(true);
+
+          fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
+          logMvts(Array.from(mvtStrings));
+          fastify.log.metric(`Evicting ${parentMvtStrings.size} parent tiles`);
+          logMvts(Array.from(parentMvtStrings));
+
+          await evictEntries(parentMvtStrings);
+          await evictEntries(mvtStrings);
+          return mvtStrings;
+        },
+      } satisfies Evictor);
+      break;
     case EvictionStrategy.CLUSTER_BOXCUT:
       fastify.log.info(
         `Using Eviction Strategy: Cluster Boxcut with Max Zoom ${maxZoom}`
@@ -255,7 +337,7 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
       fastify.decorate("evictor", {
         async evict(collectionId: string) {
           const getMvtStringsTimer = fastify.performanceMeter.startTimer(
-            `cluster-boxcut-evict-${collectionId}`
+            `ClusterBoxcut-evict-${collectionId}`
           );
           const mvtStrings = await fastify.db.getPatchedMVTStringsClusterBoxcut(
             collectionId,
@@ -264,7 +346,40 @@ const cacheEvictionPlugin: FastifyPluginAsync<{
           getMvtStringsTimer.stop(true);
 
           const findMvtParentsTimer = fastify.performanceMeter.startTimer(
-            `exact-evict-parents-${collectionId}`
+            `ClusterBoxcut-evict-parents-${collectionId}`
+          );
+          const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
+          findMvtParentsTimer.stop(true);
+
+          fastify.log.metric(`Evicting ${mvtStrings.size} tiles`);
+          logMvts(Array.from(mvtStrings));
+          fastify.log.metric(`Evicting ${parentMvtStrings.size} parent tiles`);
+          logMvts(Array.from(parentMvtStrings));
+
+          await evictEntries(parentMvtStrings);
+          await evictEntries(mvtStrings);
+          return mvtStrings;
+        },
+      } satisfies Evictor);
+      break;
+    case EvictionStrategy.CLUSTER_BOXCUT_LATERAL:
+      fastify.log.info(
+        `Using Eviction Strategy: Cluster Boxcut Lateral with Max Zoom ${maxZoom}`
+      );
+      fastify.decorate("evictor", {
+        async evict(collectionId: string) {
+          const getMvtStringsTimer = fastify.performanceMeter.startTimer(
+            `ClusterBoxcutLateral-evict-${collectionId}`
+          );
+          const mvtStrings =
+            await fastify.db.getPatchedMVTStringsClusterBoxcutLateral(
+              collectionId,
+              maxZoom
+            );
+          getMvtStringsTimer.stop(true);
+
+          const findMvtParentsTimer = fastify.performanceMeter.startTimer(
+            `ClusterBoxcutLateral-evict-parents-${collectionId}`
           );
           const parentMvtStrings = findMvtParents(maxZoom, mvtStrings);
           findMvtParentsTimer.stop(true);

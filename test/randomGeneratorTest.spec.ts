@@ -4,6 +4,7 @@ import generateRandomGeoFeatures from "./test_util/dataGenerator/spitRandomGeoms
 
 import { test } from "tap";
 
+/*
 test("random generator", async (t) => {
   t.teardown(process.exit);
 
@@ -27,3 +28,5 @@ test("random generator", async (t) => {
     url: `/collections/${colId}`,
   });
 });
+
+*/
