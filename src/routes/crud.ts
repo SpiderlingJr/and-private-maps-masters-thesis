@@ -74,7 +74,10 @@ export default async function (
             colId,
             "Upload finished."
           );
-          reply.send(jobId);
+          reply.send({
+            jobId: jobId,
+            collectionId: colId,
+          });
         })
         .catch(async (e) => {
           await app.db.updateJob(jobId, JobState.ERROR, colId, e.message);
@@ -160,11 +163,10 @@ export default async function (
         // Find all mvts that are affected by the patch
 
         const totalEvictionTimer = app.performanceMeter.startTimer(
-          `patchJob-${jobId}-total`
+          `patchJob-totalEviction-${jobId}`
         );
-        await app.evictor.evict(collId).then(async () => {
+        await app.evictor.evict(collId).then(async (droppedTiles) => {
           totalEvictionTimer.stop(true);
-          fastify.log.debug("eviction done");
           // Apply patch to database
           await app.db.patchCollection(collId);
           await app.db.updateJob(
@@ -173,9 +175,46 @@ export default async function (
             collId,
             "Patch finished."
           );
+
+          if (process.env.RELOAD_CACHE === "true") {
+            /**
+             * Reload dropped stale tiles into cache
+             */
+            app.log.metric(`Reloading ${droppedTiles.size} tiles.`);
+            const reloadTimer = app.performanceMeter.startTimer(
+              `patchJob-cacheReload-${jobId}`
+            );
+            const reloadJobId = await app.db.createJob();
+
+            await app.db
+              .fillCache(collId, droppedTiles)
+              .then(async (numTiles) => {
+                const ms = reloadTimer.stop(true);
+                const defaultMaxReload = 1000;
+                let reloadMessage;
+                if (numTiles == defaultMaxReload) {
+                  const avgReloadTime = ms / numTiles;
+                  reloadMessage = `Reloaded ${
+                    droppedTiles.size
+                  }, max reload reached. 
+                    Avg. reload time: ${avgReloadTime}ms. Expected  total reload 
+                    time: ${avgReloadTime * droppedTiles.size} ms.`;
+                  fastify.log.metric(reloadMessage);
+                } else {
+                  reloadMessage = `Reloaded ${droppedTiles.size} tiles in ${ms}ms.`;
+                  fastify.log.metric(reloadMessage);
+                }
+                await app.db.updateJob(
+                  reloadJobId,
+                  JobState.FINISHED,
+                  collId,
+                  `Reloaded ${droppedTiles.size} tiles in ${ms}ms.`
+                );
+              });
+          }
         });
       } catch (e: any) {
-        fastify.log.error("Error during patching:", e);
+        fastify.log.error("Error during patching:" + e.message);
         await app.db.updateJob(jobId, JobState.ERROR, collId, e.message);
       } finally {
         app.db.deletePatchCollection(collId);
