@@ -12,12 +12,12 @@ import { Draw, Interaction, Modify, Snap } from "ol/interaction";
 import VectorLayer from "ol/layer/Vector";
 import { transform } from "ol/proj";
 import { Vector as VectorSource } from "ol/source";
-import { Fill, Stroke, Style } from "ol/style";
+import { Circle, Fill, Stroke, Style } from "ol/style";
 
 import * as turf from "@turf/turf";
 
 import Feature from "ol/Feature";
-import { LineString, MultiPolygon, Polygon } from "ol/geom";
+import { LineString, MultiPoint, MultiPolygon, Polygon } from "ol/geom";
 
 import {
   philippineSea1,
@@ -26,6 +26,11 @@ import {
   setzensack2,
   titanicSeaRoutePlanned,
   titanicSeaRouteActual,
+  africaL,
+  africaLWestCoastPatch,
+  clusterStress,
+  clusterStressPatchPolys,
+  clusterStressPatchPoints,
 } from "./prefabGeo";
 
 const postgisCalcedDelta = turf.polygon([
@@ -58,6 +63,7 @@ const deltaLayer = new VectorSource();
 const prefabLayer1 = new VectorSource();
 const prefabLayer2 = new VectorSource();
 
+/*
 drawLayer.addFeature(
   new Feature({
     geometry: new Polygon(postgisCalcedDelta.geometry.coordinates),
@@ -86,7 +92,7 @@ if (delta) {
     })
   );
 }
-
+*/
 const drawStyle = function () {
   return [
     new Style({
@@ -95,7 +101,17 @@ const drawStyle = function () {
         width: 2,
       }),
       fill: new Fill({
-        color: "rgba(40, 128, 200, 0.3)",
+        color: "rgba(40, 128, 200, 0.1)",
+      }),
+      image: new Circle({
+        radius: 4,
+        fill: new Fill({
+          color: "rgba(40, 128, 200, 0.1)",
+        }),
+        stroke: new Stroke({
+          color: "rgba(40, 128, 200, 1.0)",
+          width: 2,
+        }),
       }),
     }),
   ];
@@ -109,7 +125,17 @@ const styleBlue = function () {
         width: 2,
       }),
       fill: new Fill({
-        color: "rgba(0, 0, 255, 0.2)",
+        color: "rgba(0, 0, 255, 0.1)",
+      }),
+      image: new Circle({
+        radius: 4,
+        fill: new Fill({
+          color: "rgba(0, 0, 255, 0.1)",
+        }),
+        stroke: new Stroke({
+          color: "rgba(0, 0, 255, 1.0)",
+          width: 3,
+        }),
       }),
     }),
   ];
@@ -118,11 +144,21 @@ const styleGreen = function () {
   return [
     new Style({
       stroke: new Stroke({
-        color: "rgba(0, 255, 0, 1.0)",
-        width: 2,
+        color: "rgba(40, 210, 100, 1.0)",
+        width: 3,
       }),
       fill: new Fill({
-        color: "rgba(0, 255, 0, 0.2)",
+        color: "rgba(40, 210, 100, 0.1)",
+      }),
+      image: new Circle({
+        radius: 4,
+        fill: new Fill({
+          color: "rgba(40, 210, 100, 0.1)",
+        }),
+        stroke: new Stroke({
+          color: "rgba(40, 210, 100, 1.0)",
+          width: 3,
+        }),
       }),
     }),
   ];
@@ -131,11 +167,22 @@ const styleRed = function () {
   return [
     new Style({
       stroke: new Stroke({
-        color: "rgba(255, 0, 0, 1.0)",
+        color: "rgba(230, 20, 20, 1.0)",
         width: 2,
+        lineDash: [5, 5],
       }),
       fill: new Fill({
-        color: "rgba(255, 0, 0, 0.2)",
+        color: "rgba(230, 20, 20, 0.3)",
+      }),
+      image: new Circle({
+        radius: 10,
+        fill: new Fill({
+          color: "rgba(230, 20, 20, 0.1)",
+        }),
+        stroke: new Stroke({
+          color: "rgba(230, 20, 20, 1.0)",
+          width: 3,
+        }),
       }),
     }),
   ];
@@ -173,15 +220,7 @@ const map = new Map({
       source: new OSM(),
     }),
     new VectorTileLayer({
-      declutter: true,
-      source: new VectorTileSource({
-        format: new MVT(),
-        url: coll1Url,
-      }),
-      style: styleGreen(),
-    }),
-    new VectorTileLayer({
-      declutter: true,
+      //declutter: true,
       source: new VectorTileSource({
         format: new MVT(),
         url: coll2Url,
@@ -190,6 +229,14 @@ const map = new Map({
     }),
     new VectorTileLayer({
       declutter: true,
+      source: new VectorTileSource({
+        format: new MVT(),
+        url: coll1Url,
+      }),
+      style: styleGreen(),
+    }),
+    new VectorTileLayer({
+      //declutter: true,
       source: new VectorTileSource({
         format: new MVT(),
         url: "",
@@ -264,40 +311,17 @@ document
 
     const deltaUrl = `http://localhost:3000/collections/${collId.newColl}/{z}/{x}/{y}.vector.pbf`;
     const layers = map.getLayers().getArray();
-    (layers[3] as VectorTileLayer).getSource()?.clear();
+    (layers[1] as VectorTileLayer).getSource()?.clear();
+    (layers[1] as VectorTileLayer).getSource()?.setUrl("");
+    (layers[1] as VectorTileLayer).getSource()?.refresh();
+    //(layers[2] as VectorTileLayer).getSource()?.clear();
+    //(layers[2] as VectorTileLayer).getSource()?.setUrl("");
+    //(layers[2] as VectorTileLayer).getSource()?.refresh();
     (layers[3] as VectorTileLayer).getSource()?.setUrl(deltaUrl);
+    (layers[3] as VectorTileLayer).getSource()?.clear();
+    (layers[3] as VectorTileLayer).getSource()?.refresh();
 
     await fetch("http://localhost:3000/dropCache");
-    /*const layers = map.getLayers().getArray();
-
-  const layerSource1 = (layers[1] as VectorTileLayer).getSource();
-  const layerSource2 = (layers[2] as VectorTileLayer).getSource();
-
-  if (!layerSource1 || !layerSource2) {
-    return;
-  }
-  const feature1 = layerSource1.getFeaturesInExtent(
-    map.getView().calculateExtent(map.getSize())
-  )[0];
-  const feature2 = layerSource2.getFeaturesInExtent(
-    map.getView().calculateExtent(map.getSize())
-  )[0];
-
-  let ft1;
-  let ft2;
-
-  const geoJSONFormat = new GeoJSON();
-  const ft1GeoJSON = geoJSONFormat.writeFeatureObject(ft1!);
-  const ft2GeoJSON = geoJSONFormat.writeFeatureObject(ft2!);
-
-  const ft1g = ft1GeoJSON as unknown as Feature<Polygon | MultiPolygon, {}>;
-  const ft2g = ft2GeoJSON as unknown as Feature<Polygon | MultiPolygon, {}>;
-  // Check that the features indeed have Polygon or MultiPolygon geometries
-
-  const delta = turf.difference(ft1g, ft2g);
-  console.log("Ft1:", ft1);
-  console.log("Ft2:", ft2);
-  */
   });
 
 document
@@ -361,11 +385,11 @@ collection1DisplayButton.addEventListener("click", async function () {
   console.log("now coll1Url is", coll1Url);
   const layers = map.getLayers().getArray();
 
-  (layers[1] as VectorTileLayer).getSource()?.clear();
-  (layers[1] as VectorTileLayer).getSource()?.setUrl(coll1Url);
+  (layers[2] as VectorTileLayer).getSource()?.clear();
+  (layers[2] as VectorTileLayer).getSource()?.setUrl(coll1Url);
   console.log(
     "layer source",
-    (layers[1] as VectorTileLayer).getSource()?.getUrls()
+    (layers[2] as VectorTileLayer).getSource()?.getUrls()
   );
   await fetch(`http://localhost:3000/dropCache`);
 });
@@ -377,11 +401,14 @@ collection2DisplayButton.addEventListener("click", async function () {
   coll2Url = `/collections/${coll2}/{z}/{x}/{y}.vector.pbf`;
   console.log("now coll2Url is", coll2Url);
   const layers = map.getLayers().getArray();
-  (layers[2] as VectorTileLayer).getSource()?.clear();
-  (layers[2] as VectorTileLayer).getSource()?.setUrl(coll2Url);
+  // hide layer 1
+  (layers[1] as VectorTileLayer).getSource()?.clear();
+  (layers[1] as VectorTileLayer).getSource()?.setUrl("");
+  (layers[1] as VectorTileLayer).getSource()?.refresh();
+  (layers[1] as VectorTileLayer).getSource()?.setUrl(coll2Url);
   console.log(
     "layer source",
-    (layers[2] as VectorTileLayer).getSource()?.getUrls()
+    (layers[1] as VectorTileLayer).getSource()?.getUrls()
   );
   await fetch(`http://localhost:3000/dropCache`);
 });
@@ -422,6 +449,40 @@ document
             })
           );
           break;
+        case "africaL":
+          prefabLayer1.addFeature(
+            new Feature({
+              geometry: new Polygon(africaL.geometry.coordinates),
+            })
+          );
+          prefabLayer2.addFeature(
+            new Feature({
+              geometry: new Polygon(africaLWestCoastPatch.geometry.coordinates),
+            })
+          );
+          break;
+        case "clusterStress":
+          prefabLayer1.addFeature(
+            new Feature({
+              geometry: new MultiPolygon(clusterStress.geometry.coordinates),
+            })
+          );
+          prefabLayer2.addFeature(
+            new Feature({
+              geometry: new MultiPolygon(
+                clusterStressPatchPolys.geometry.coordinates
+              ),
+            })
+          );
+          prefabLayer2.addFeature(
+            new Feature({
+              geometry: new MultiPoint(
+                clusterStressPatchPoints.geometry.coordinates
+              ),
+            })
+          );
+
+          break;
         case "midway":
           throw new Error("Not implemented");
       }
@@ -433,6 +494,11 @@ document
   ?.addEventListener("click", function () {
     prefabLayer1.clear();
     prefabLayer2.clear();
+    // clear all layers except base map
+    const layers = map.getLayers().getArray();
+    for (let i = 1; i < layers.length; i++) {
+      (layers[i] as VectorTileLayer).getSource()?.clear();
+    }
   });
 
 // Create interation for drawing a polygon
