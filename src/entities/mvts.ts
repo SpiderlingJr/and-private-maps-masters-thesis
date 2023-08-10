@@ -152,3 +152,14 @@ export class MVT13 extends BaseEntity {
   @Column({ type: "geometry", spatialFeatureType: "GEOMETRY", srid: 4326 })
   geom: Geometry;
 }
+@Entity("mvt14")
+export class MVT14 extends BaseEntity {
+  @PrimaryColumn({ type: "smallint" })
+  x: number;
+
+  @PrimaryColumn({ type: "smallint" })
+  y: number;
+
+  @Column({ type: "geometry", spatialFeatureType: "GEOMETRY", srid: 4326 })
+  geom: Geometry;
+}

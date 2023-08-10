@@ -23,6 +23,7 @@ import {
   MVT11,
   MVT12,
   MVT13,
+  MVT14,
 } from "src/entities/mvts.js";
 //@ts-expect-error no types
 import vt from "vector-tile";
@@ -352,6 +353,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           MVT11,
           MVT12,
           MVT13,
+          MVT14,
         ],
         synchronize: true,
       });
