@@ -24,6 +24,7 @@ services:
 
   db:
     image: postgis/postgis:15-3.3-alpine
+    shm_size: 120gb
     environment:
       PGDATA: /var/lib/postgresql/data/pgdata
     env_file:
