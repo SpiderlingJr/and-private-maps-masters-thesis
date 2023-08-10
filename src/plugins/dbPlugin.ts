@@ -324,6 +324,7 @@ interface PostgresDB {
  */
 const dbPlugin: FastifyPluginAsync = async (fastify) => {
   let conn: DataSource;
+  const EPS_BASE = 8;
   async function connectDB(): Promise<DataSource> {
     try {
       conn = new DataSource({
@@ -906,7 +907,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       return mvtStrings;
     },
     async getPatchedMVTStringsClusterBoxcut(collId: string, zoomLevel: number) {
-      const epsZ = 128 / Math.pow(2, zoomLevel);
+      const epsZ = EPS_BASE / Math.pow(2, zoomLevel);
       fastify.log.metric({
         name: "epsZ",
         value: epsZ,
@@ -1026,7 +1027,11 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
             JOIN y_series AS ys ON xs.cluster_id = ys.cluster_id;
         `
       );
-      fastify.log.info("MVT Cluster Result:", mvtResult);
+      //fastify.log.info("MVT Cluster Result:", mvtResult);
+      // Log last line of mvtResult.cluster_id to see amount of clusters
+      fastify.log.metric(
+        `CLUSTER AMOUNT: ${mvtResult[mvtResult.length - 1].cluster_id}`
+      );
       // Build MVTStrings from query Result
       for (const row of mvtResult) {
         const { cluster_id, tile_x, tile_y } = row;
@@ -1038,7 +1043,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       collId: string,
       zoomLevel: number
     ) {
-      const epsZ = 128 / Math.pow(2, zoomLevel);
+      const epsZ = EPS_BASE / Math.pow(2, zoomLevel);
       fastify.log.metric({
         name: "epsZ",
         value: epsZ,
@@ -1156,9 +1161,12 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
         FROM
             x_series AS xs
             JOIN y_series AS ys ON xs.cluster_id = ys.cluster_id;
+        
         `
       );
-      fastify.log.info("MVT Cluster Result:", mvtResult);
+      fastify.log.metric(
+        `CLUSTER AMOUNT: ${mvtResult[mvtResult.length - 1].cluster_id}`
+      );
       // Build MVTStrings from query Result
       for (const row of mvtResult) {
         const { cluster_id, tile_x, tile_y } = row;
@@ -1167,7 +1175,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
       return mvtStrings;
     },
     async getPatchedMVTStringsClusterExact(collId: string, zoomLevel: number) {
-      const epsZ = 128 / Math.pow(2, zoomLevel);
+      const epsZ = EPS_BASE / Math.pow(2, zoomLevel);
       fastify.log.metric({
         name: "epsZ",
         value: epsZ,
@@ -1261,8 +1269,7 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
                   CLUSTERS
           )
         SELECT
-          --CLUSTER_BBOX_BOUNDS.cluster_id,
-          distinct
+          CLUSTER_BBOX_BOUNDS.cluster_id AS cluster_id,
           mvt_prefab.x AS tile_x,
           mvt_prefab.y AS tile_y
         FROM
@@ -1275,10 +1282,18 @@ const dbPlugin: FastifyPluginAsync = async (fastify) => {
           mvt_prefab.y BETWEEN (CLUSTER_BBOX_BOUNDS.top_left).tile_y AND (CLUSTER_BBOX_BOUNDS.bot_right).tile_y
         AND 
           ST_Intersects(ST_Transform(ST_SetSRID(CLUSTER_BBOX_BOUNDS.geom, 3857), 4326), mvt_prefab.geom)
+        GROUP BY
+          cluster_id,
+          tile_x,
+          tile_y
         ORDER BY
+          cluster_id ASC,
           tile_x ASC,
           tile_y ASC;
         `
+      );
+      fastify.log.metric(
+        `CLUSTER AMOUNT: ${mvtResult[mvtResult.length - 1].cluster_id}`
       );
       //fastify.log.info(`MVT Cluster Result: ${JSON.stringify(mvtResult)}`);
       // Build MVTStrings from query Result
