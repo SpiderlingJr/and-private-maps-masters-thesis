@@ -19,8 +19,8 @@ async function getJobState(jobId: string) {
  */
 async function awaitJobCompletion(
   jobId: string,
-  interval = 1000,
-  maxRetries = 5
+  interval = 2000,
+  maxRetries = 60
 ) {
   let retries = 0;
   while (retries < maxRetries) {

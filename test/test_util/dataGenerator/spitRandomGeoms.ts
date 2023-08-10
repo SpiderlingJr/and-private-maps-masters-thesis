@@ -54,30 +54,30 @@ export default async function generateRandomGeoFeatures(
 
   const originalFeaturesPath = path.join(
     storeDir,
-    `${genId}_o_${NUM_FEATURES}f.ndjson`
+    `${genId}_o_${numFeatures}f.ndjson`
   );
   const allFeaturesGeojsonPath = path.join(
     storeDir,
-    `${genId}_g_${NUM_FEATURES}f.geojson`
+    `${genId}_g_${numFeatures}f.geojson`
   );
   const patchableMutatedPath = path.join(
     storeDir,
-    `${genId}_1_${NUM_FEATURES}f.ndjson`
+    `${genId}_1_${numFeatures}f.ndjson`
   );
   const patchableOriginalPath = path.join(
     storeDir,
-    `${genId}_2_${NUM_FEATURES}f.ndjson`
+    `${genId}_2_${numFeatures}f.ndjson`
   );
 
   // generate numFeatures random features
-  const randomFeatures = rg.generateRandomGeometry(
-    numFeatures,
-    {},
-    { geomType: "Point" }
-  );
+  const randomFeatures = rg.generateRandomGeometry(numFeatures, {
+    bbox: [6.5, 47.2, 14.5, 54.9], //germany
+    //bbox: [-180, -90, 180, 90],
+    max_radial_length: 0.5,
+  });
   // mutate them
-  const mutatedFeatures = rg.mutateGeometry(randomFeatures, {
-    uniformMutation: true,
+  const mutatedFeatures = rg.mutateFeatureCollection(randomFeatures, {
+    pMutation: 0.75,
   });
   // patch original and mutated features into collective geojson
   const concatFeatures = randomFeatures.features.concat(
@@ -89,6 +89,7 @@ export default async function generateRandomGeoFeatures(
   // Store original data as ndjson
   writeAsNdjson(randomFeatures, originalFeaturesPath);
 
+  /*
   // post features to database
   const postResponse = await postFeaturesToService(originalFeaturesPath);
   // wait for job to finish, 1sec
@@ -97,7 +98,7 @@ export default async function generateRandomGeoFeatures(
   const collectionId = JSON.parse(jobResponse.body).job_collection;
   // get collectionId and featureId from database
   const featureIds = await getFeatureIdsFromService(collectionId);
-
+  
   // add collectionId to mutated properties
   const mutatedFeaturesWithId = {
     ...mutatedFeatures,
@@ -130,13 +131,13 @@ export default async function generateRandomGeoFeatures(
       return feat;
     }
   );
-
-  writeAsNdjson(mutatedFeaturesWithId, patchableMutatedPath);
+  */
+  writeAsNdjson(mutatedFeatures, patchableMutatedPath);
   // Store original data as ndjson, with featId and collectionId
-  writeAsNdjson(originalFeaturesWithId, patchableOriginalPath);
+  //writeAsNdjson(originalFeaturesWithId, patchableOriginalPath);
 
   return {
-    collectionId,
+    //collectionId,
     geoJsonFilePath: allFeaturesGeojsonPath,
     originalFeaturesPath,
     patchableMutatedPath,

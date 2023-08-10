@@ -15,18 +15,54 @@ import { test } from "tap";
 
 import prepUpdate from "./test_util/dataGenerator/PrepUpdateSet.js";
 import { awaitJobCompletion } from "./test_util/injects.js";
-
 /*
+//titanic
+const originalFeaturesPath = "test/data/static/titanic/titanicPlanned.ndjson";
+const updateFeaturesPath = "test/data/static/titanic/titanicRest.ndjson";
+const patchablePath = "test/data/static/titanic/titanicPatchRS.ndjson";
+*/
+/*
+// denseLocal
+const originalFeaturesPath =
+  "test/data/static/denseLocal/denseLocalAuto.ndjson";
+const updateFeaturesPath =
+  "test/data/static/denseLocal/denseLocalPatchAuto.ndjson";
+const patchablePath = "test/data/static/denseLocal/denseLocalPatchRS.ndjson";
+*/
+/*
+//ger 100f
+const originalFeaturesPath = "test/data/dynamic/ger/230802_ger_o_100f.ndjson";
+const updateFeaturesPath = "test/data/dynamic/ger/230802_ger_1_100f.ndjson";
+const patchablePath = "test/data/dynamic/ger/230802_ger_RS_100f.ndjson";
+*/
+/*
+// AfricaL
+const originalFeaturesPath = "test/data/static/africaL/africaLAuto.ndjson";
+const updateFeaturesPath = "test/data/static/africaL/africaLAutoPatch.ndjson";
+const patchablePath = "test/data/static/africaL/africaLPatchRS.ndjson";
+*/
+
+// CLUSTER STRESS
 const originalFeaturesPath =
   "test/data/static/clusterStress/clusterStressAuto.ndjson";
 const updateFeaturesPath =
   "test/data/static/clusterStress/clusterStressPatch.ndjson";
 const patchablePath =
   "test/data/static/clusterStress/clusterStressPatchRS.ndjson";
-  */
-const originalFeaturesPath = "test/data/dynamic/230719_rand_o_50f.ndjson";
+
+/* F20
+  const originalFeaturesPath = "test/data/dynamic/230719_rand_o_50f.ndjson";
 const updateFeaturesPath = "test/data/dynamic/230719_rand_1_50f.ndjson";
 const patchablePath = "test/data/dynamic/230719_rand_2_50f.ndjson";
+*/
+/*
+//F50
+const originalFeaturesPath =
+  "test/data/dynamic/RAND_f50/230802_rand_o_50f.ndjson";
+const updateFeaturesPath =
+  "test/data/dynamic/RAND_f50/230802_rand_1_50f.ndjson";
+const patchablePath = "test/data/dynamic/RAND_f50/230802_rand_RS_50f.ndjson";
+*/
 /** This test is intended to test the eviction of two completely disjunct
  *  quadrangle features
  */
@@ -75,13 +111,13 @@ test("anEviction", async (t) => {
   const patchJobResponse = await awaitJobCompletion(
     patchResponse.body,
     10000,
-    10
+    100
   ).catch((e) => {
     app.log.error(`timeout during patch job completion`);
   });
   app.log.info(`jobId: ${jobId}`);
   app.log.info(`collectionId: ${collectionId}`);
-  app.log.info(`featureIds: ${featureIds}`);
+  //app.log.info(`featureIds: ${featureIds}`);
   app.log.info(`patchResponse ${patchResponse.statusCode}`);
 
   // wait for 60 seconds to allow eviction to happen

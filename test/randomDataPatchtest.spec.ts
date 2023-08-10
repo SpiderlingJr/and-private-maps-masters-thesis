@@ -25,9 +25,9 @@ test("standard workflow on randomly generated geodata", async (t) => {
   t.before(async () => {
     try {
       const testData = await generateRandomGeoFeatures(
-        20,
+        100,
         "test/data/dynamic",
-        "230719_rand"
+        "ger/230802_ger"
       );
       randomTestDataPaths = testData;
     } catch (e) {
