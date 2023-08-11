@@ -51,6 +51,20 @@ Per default, it runs on port 5173. So it's accessible from localhost:5173 in a b
 
 The frontend features an OpenStreetMap base map with a vector tile overlay. You can visualize prefabricated datasets using the drop-down menu or visualise own collections.
 
+Testing invalidation strategies
+---
+
+The framework for testing the strategies is in test/invalTestFramework.ts
+
+It is runnable using 
+```
+yarn test test/invalTestFramework.ts
+```
+
+Note that the test data we used is provided and has to be commented out in the file before running it, to chose which test data set to use. 
+
+
+
 Structure
 ---
 
