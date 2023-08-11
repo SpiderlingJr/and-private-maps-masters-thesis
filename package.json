@@ -27,7 +27,7 @@
     "prepare": "husky install"
   },
   "keywords": [],
-  "author": "Wolfgang Hobmaier <wolfgang.hobmaier@and-solution.com>",
+  "author": "Christoher Brinker <christopher.brinker@and-solution.com>",
   "license": "UNLICENSED",
   "tap": {
     "node-arg": [
