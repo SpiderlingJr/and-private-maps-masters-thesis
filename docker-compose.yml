@@ -47,22 +47,3 @@ services:
       # outside wihout interfering with
       # the host's redis
       - 6378:6379
-#  importer:
-#    command: importer update
-#    build:
-#      context: importer
-#      dockerfile: Dockerfile
-#    volumes:
-#      - importer_data:/data
-#      - ./importer/download:/download
-#      - ./importer/mapping.yml:/data/mapping.yml
-#    env_file:
-#      - .env
-#    environment:
-#      POSTGRES_HOST: db
-#      PBF_URL: http://download.geofabrik.de/europe/germany/bayern-latest.osm.pbf
-#      REPLICATION_URL: https://download.geofabrik.de/europe/germany/bayern-updates/
-#      REPLICATION_INTERVAL: 24h
-#    networks:
-#      - idp
-
